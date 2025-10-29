@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <title>TimeWheel Demo</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    body {
+      background: #111;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+    }
+    svg {
+      background: #222;
+      border-radius: 50%;
+    }
+  </style>
+</head>
+<body>
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 20px;">
+    <div style="display: flex; gap: 10px; align-items: center;">
+      <button id="prevMonth" style="background: #333; color: white; border: 1px solid #555; padding: 5px 15px; cursor: pointer; font-size: 16px;">←</button>
+      <div id="dateDisplay" style="color: white; font-size: 18px; min-width: 300px; text-align: center; font-family: sans-serif;"></div>
+      <button id="nextMonth" style="background: #333; color: white; border: 1px solid #555; padding: 5px 15px; cursor: pointer; font-size: 16px;">→</button>
+    </div>
+    <svg id="timewheel" width="600" height="600"></svg>
+  </div>
+</body>
+</html>
+  <script src="main.js"></script>
+</body>
+</html>
