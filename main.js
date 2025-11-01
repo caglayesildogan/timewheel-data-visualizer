@@ -316,40 +316,40 @@ function updateDateDisplay() {
 // Mouse Event Handler
 
 function isOverSliderEdge(x, y) {
-    const currentStartX = dayScale(startDay);
-    const currentEndX = dayScale(endDay) + 16; // Slider-Breite berücksichtigen
     const sliderWidth = 16;
+    const currentStartX = dayScale(startDay);
+    const currentEndX = dayScale(endDay);
     const edgeWidth = 5;  // Kanten-Griffbreite
     const moveHit = 4;   // Halbbreite des mittleren Move-Griffs für Single-Day (halbe Breite)
 
     // Prüfe, ob der Maus-y innerhalb des Sliders liegt
     if (y >= centerY - sliderWidth / 2 && y <= centerY + sliderWidth / 2) {
-        // Sonderfall: einzelner Tag -> ganze Fläche als Verschieben behandeln
+        // Sonderfall: einzelner Tag -> kleine mittlere Fläche als Verschieben behandeln
         if (currentStartX === currentEndX) {
             // Für einen Ein-Tages-Slider: kleineren mittleren Move-Bereich verwenden
             if (x >= currentStartX + edgeWidth && x <= currentEndX + sliderWidth - edgeWidth) {
                 return 'move';
             }
             // Kanten zum Größenändern bleiben erreichbar: links/rechts innerhalb edgeWidth
-            if (x >= currentStartX && x < currentStartX + edgeWidth) {
+            if (x >= currentStartX - edgeWidth/2 && x < currentStartX + edgeWidth/2) {
                 return 'left';
             }
-            if (x <= currentEndX && x > currentEndX - edgeWidth) {
+            if (x <= currentEndX + sliderWidth + edgeWidth && x > currentEndX + sliderWidth - edgeWidth) {
                 return 'right';
             }
             return null;
         }
 
         // Normaler Bereich: großer Mittelbereich zum Verschieben
-        if (x >= currentStartX + edgeWidth && x <= currentEndX - edgeWidth) {
+        if (x >= currentStartX + edgeWidth && x <= currentEndX + sliderWidth/2 - edgeWidth) {
             return 'move';
         }
 
         // Kanten zum Größenändern
-        if (x >= currentStartX - edgeWidth && x <= currentStartX + edgeWidth) {
+        if (x >= currentStartX - edgeWidth && x <= currentStartX + edgeWidth/2) {
             return 'left';
         }
-        if (x >= currentEndX - edgeWidth && x <= currentEndX + edgeWidth) {
+        if (x >= currentEndX + sliderWidth/2 - edgeWidth && x <= currentEndX + sliderWidth/2 + edgeWidth) {
             return 'right';
         }
     }
@@ -421,18 +421,27 @@ function handleDrag(e) {
 
     switch (dragMode) {
         case 'left':
-            const newStartDay = Math.min(Math.max(1, newDay), endDay - 1);
-            if (newStartDay !== startDay) {
-                startDay = newStartDay;
-                updateDateDisplay();
+            {
+                // Allow collapsing to a single day (allow equality)
+                const newStartDay = clamp(newDay, 1, endDay);
+                if (newStartDay !== startDay) {
+                    startDay = newStartDay;
+                    // Ensure endDay is at least startDay (should already be true)
+                    if (endDay < startDay) endDay = startDay;
+                    updateDateDisplay();
+                }
             }
             break;
             
         case 'right':
-            const newEndDay = Math.max(Math.min(daysInMonth, newDay), startDay + 1);
-            if (newEndDay !== endDay) {
-                endDay = newEndDay;
-                updateDateDisplay();
+            {
+                // Allow collapsing to a single day (allow equality)
+                const newEndDay = clamp(newDay, startDay, daysInMonth);
+                if (newEndDay !== endDay) {
+                    endDay = newEndDay;
+                    if (startDay > endDay) startDay = endDay;
+                    updateDateDisplay();
+                }
             }
             break;
             
