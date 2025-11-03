@@ -55,29 +55,77 @@ select, button {
 .row { 
   display:flex; gap:8px; 
 }
-.row button { flex:1; }
+.row button { 
+  flex:1; }
 
-.axis-list { list-style:none; padding:0; margin:8px 0; max-height:220px; overflow:auto; }
+.axis-list { 
+  list-style:none; 
+  padding:0; 
+  margin:8px 0; 
+  max-height:220px; 
+  overflow:auto; }
 
 .axis-item {
-  display:flex; align-items:center; gap:8px; padding:6px;
-  border-radius:6px; border:1px solid transparent; cursor:pointer;
+  display:flex; 
+  align-items:center; 
+  gap:8px; 
+  padding:6px;
+  border-radius:6px; 
+  border:1px solid transparent; 
+  cursor:pointer;
 }
-.axis-item.selected { border-color:#4b5563; background:#25282c; }
+.axis-item.selected { 
+  border-color:#4b5563; 
+  background:#25282c; 
+}
 
-.chip { width:10px; height:10px; border-radius:50%; }
+.chip {
+   width:10px; 
+   height:10px; 
+   border-radius:50%; 
+  }
 
-.axis-meta { display:flex; flex-direction:column; flex:1; }
+.axis-meta { 
+  display:flex; 
+  flex-direction:column; 
+  flex:1; 
+}
 
-.axis-name { font-size:13px; }
-.axis-sub  { font-size:11px; color:#9aa0a6; }
+.axis-name { 
+  font-size:13px; 
+}
+.axis-sub  { 
+  font-size:11px; 
+  color:#9aa0a6; 
+}
 
 /* Style for the date header and navigation buttons in the scene */
 .topbar {
-  display:flex; gap:10px; align-items:center; justify-content:center; margin-bottom:12px;
+  display:flex; 
+  gap:10px; 
+  align-items:center; 
+  justify-content:center; 
+  margin-bottom:12px;
 }
-.topbar button { background:#333; color:#fff; border:1px solid #555; padding:5px 15px; cursor:pointer; font-size:16px; }
 
-#dateDisplay { color:#fff; font-size:18px; min-width:300px; text-align:center; font-family:sans-serif; }
+.topbar button { 
+  background:#333; 
+  color:#fff; 
+  border:1px solid #555; 
+  padding:5px 15px; 
+  cursor:pointer; 
+  font-size:16px; 
+}
 
-canvas#glCanvas { background:#222; border-radius:50%; }
+#dateDisplay { 
+  color:#fff; 
+  font-size:18px; 
+  min-width:300px; 
+  text-align:center; 
+  font-family:sans-serif; 
+}
+
+canvas#glCanvas { 
+  background:#222; 
+  border-radius:50%; 
+}
