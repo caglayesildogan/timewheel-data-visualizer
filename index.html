@@ -4,32 +4,70 @@
   <meta charset="UTF-8" />
   <title>TimeWheel Demo</title>
   <script src="https://d3js.org/d3.v7.min.js"></script>
-  <style>
-    body {
-      background: #111;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-      margin: 0;
-    }
-    svg {
-      background: #222;
-      border-radius: 50%;
-    }
-  </style>
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <div style="display: flex; flex-direction: column; align-items: center; gap: 20px;">
-    <div style="display: flex; gap: 10px; align-items: center;">
-      <button id="prevMonth" style="background: #333; color: white; border: 1px solid #555; padding: 5px 15px; cursor: pointer; font-size: 16px;">←</button>
-      <div id="dateDisplay" style="color: white; font-size: 18px; min-width: 300px; text-align: center; font-family: sans-serif;"></div>
-      <button id="nextMonth" style="background: #333; color: white; border: 1px solid #555; padding: 5px 15px; cursor: pointer; font-size: 16px;">→</button>
-    </div>
-    <canvas id="glCanvas" width="600" height="600" style="background: #222; border-radius: 50%;"></canvas>
+
+  <div class="layout">
+    <!-- Links: Control Panel -->
+    <aside id="controls" class="panel">
+      <h3>Controls</h3>
+
+      <div class="field">
+        <label>Axes Arrangement</label>
+        <select id="arrangement">
+          <option value="coordinatesWheel">Coordinates Wheel</option>
+          <option value="parallel">Parallel (optional)</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Variables and Axes</label>
+        <ul id="axisList" class="axis-list"></ul>
+
+        <div class="row" style="margin-top:6px;">
+          <button id="btnUp" title="Move up">▲</button>
+          <button id="btnDown" title="Move down">▼</button>
+          <button id="btnRemove" title="Remove axis">✖</button>
+        </div>
+
+        <div class="field small">
+          <label>Axes Type</label>
+          <select id="axisType">
+            <option value="scroll">Scroll Axis</option>
+            <option value="static">Static Axis</option>
+          </select>
+        </div>
+
+        <div class="field small">
+          <label>Axes Linking</label>
+          <select id="linking">
+            <option value="none">No Linking</option>
+            <option value="range">Range Linking</option>
+            <option value="highlight">Highlight Linking</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row">
+        <button id="btnAddAll" title="Add default climate axes">+ Add defaults</button>
+        <button id="btnReset">Reset</button>
+      </div>
+    </aside>
+
+    <!-- Rechts -->
+    <main class="stage">
+      <div>
+        <div class="topbar">
+          <button id="prevMonth">←</button>
+          <div id="dateDisplay"></div>
+          <button id="nextMonth">→</button>
+        </div>
+        <canvas id="glCanvas" width="600" height="600"></canvas>
+      </div>
+    </main>
   </div>
-</body>
-</html>
+
   <script src="main.js"></script>
 </body>
 </html>

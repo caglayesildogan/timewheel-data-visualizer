@@ -1,0 +1,83 @@
+body { 
+  background:#111; 
+  height:100vh; 
+  margin:0; }
+
+.layout { 
+  display:flex; 
+  gap:16px; 
+  height:100vh; 
+  padding:16px; 
+  box-sizing:border-box; 
+}
+
+.panel {
+  width:260px; 
+  background:#1d1f22; 
+  color:#e6e6e6; 
+  padding:14px;
+  border-radius:10px; 
+  box-shadow:0 0 10px rgba(0,0,0,.25); 
+  overflow:auto;
+  font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+}
+
+.stage { 
+  flex:1; 
+  display:flex; 
+  align-items:center; 
+  justify-content:center; 
+}
+
+.field { 
+  margin:10px 0; 
+}
+
+.field.small { 
+  margin-top:6px; 
+}
+
+label { 
+  display:block; 
+  font-size:13px; 
+  color:#bfc3c8; 
+  margin-bottom:4px; }
+
+select, button {
+  width:100%; 
+  background:#2a2d31; 
+  color:#e6e6e6; 
+  border:1px solid #3a3f45;
+  border-radius:6px; 
+  padding:6px 8px;
+}
+
+.row { 
+  display:flex; gap:8px; 
+}
+.row button { flex:1; }
+
+.axis-list { list-style:none; padding:0; margin:8px 0; max-height:220px; overflow:auto; }
+
+.axis-item {
+  display:flex; align-items:center; gap:8px; padding:6px;
+  border-radius:6px; border:1px solid transparent; cursor:pointer;
+}
+.axis-item.selected { border-color:#4b5563; background:#25282c; }
+
+.chip { width:10px; height:10px; border-radius:50%; }
+
+.axis-meta { display:flex; flex-direction:column; flex:1; }
+
+.axis-name { font-size:13px; }
+.axis-sub  { font-size:11px; color:#9aa0a6; }
+
+/* Style for the date header and navigation buttons in the scene */
+.topbar {
+  display:flex; gap:10px; align-items:center; justify-content:center; margin-bottom:12px;
+}
+.topbar button { background:#333; color:#fff; border:1px solid #555; padding:5px 15px; cursor:pointer; font-size:16px; }
+
+#dateDisplay { color:#fff; font-size:18px; min-width:300px; text-align:center; font-family:sans-serif; }
+
+canvas#glCanvas { background:#222; border-radius:50%; }

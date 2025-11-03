@@ -6,6 +6,13 @@ const height = 600;
 const centerX = width / 2;
 const centerY = height / 2;
 
+// support High-DPI displays
+const DPR = window.devicePixelRatio || 1;
+canvas.style.width = width + 'px';
+canvas.style.height = height + 'px';
+canvas.width = Math.floor(width * DPR);
+canvas.height = Math.floor(height * DPR);
+
 // Ensure canvas internal pixel size matches our drawing resolution
 canvas.width = width;
 canvas.height = height;
@@ -14,6 +21,36 @@ if (!gl) {
     alert('WebGL nicht verfügbar');
     throw new Error('WebGL nicht verfügbar');
 }
+
+// === CONTROL PANEL STATE (sidebar) ===
+const DEFAULT_AXES = [
+  { key: 'Date',              type: 'scroll',  color: '#9ca3af', enabled: true,  isTime: true },
+  { key: 'AvgTemp',           type: 'static',  color: '#ef4444', enabled: true },
+  { key: 'MaxTemp',           type: 'static',  color: '#f59e0b', enabled: true },
+  { key: 'MinTemp',           type: 'static',  color: '#3b82f6', enabled: true },
+  { key: 'Precipitation',     type: 'static',  color: '#eab308', enabled: true },
+  { key: 'RelHumidity',       type: 'static',  color: '#a855f7', enabled: true },
+  { key: 'CloudCover',        type: 'static',  color: '#10b981', enabled: true },
+  { key: 'SunshineDuration',  type: 'static',  color: '#f97316', enabled: true },
+  { key: 'AirPressure',       type: 'static',  color: '#22d3ee', enabled: true }
+];
+
+let __controlsState = {
+  arrangement: 'coordinatesWheel',
+  linking: 'none',
+  axes: JSON.parse(JSON.stringify(DEFAULT_AXES)),
+  selectedIndex: 0
+};
+
+// The control panel calls this whenever the user changes something.
+// We just replace our local state.
+window.onControlsChange = (st) => {
+  __controlsState = JSON.parse(JSON.stringify(st));
+};
+
+// Handy for debugging in DevTools:
+window.getControlsState = () => JSON.parse(JSON.stringify(__controlsState));
+
 
 // Enable alpha blending
 gl.enable(gl.BLEND);
@@ -26,9 +63,8 @@ const vertexShaderSource = `
     
     void main() {
         vec2 zeroToOne = a_position / u_resolution;
-        vec2 zeroToTwo = zeroToOne * 2.0;
-        vec2 clipSpace = zeroToTwo - 1.0;
-        gl_Position = vec4(clipSpace, 0, 1);
+        vec2 clipSpace = zeroToOne * 2.0 - 1.0;
+        gl_Position = vec4(clipSpace.x, -clipSpace.y, 0, 1);
     }
 `;
 
@@ -76,12 +112,20 @@ const positionAttributeLocation = gl.getAttribLocation(program, 'a_position');
 const resolutionUniformLocation = gl.getUniformLocation(program, 'u_resolution');
 const colorUniformLocation = gl.getUniformLocation(program, 'u_color');
 
-// Buffer für die Position
+// Buffer für die Position (allocate once)
 const positionBuffer = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+
+// allocate a reasonably large dynamic buffer once (bytes)
+gl.bufferData(gl.ARRAY_BUFFER, 256 * 1024, gl.DYNAMIC_DRAW);
+
+// setup attribute pointer once
+gl.enableVertexAttribArray(positionAttributeLocation);
+gl.vertexAttribPointer(positionAttributeLocation, 2, gl.FLOAT, false, 0, 0);
 
 // Timeline Konfiguration
-const timelineStart = centerX - 100;
-const timelineEnd = centerX + 100;
+const timelineStart = centerX - 100 * DPR;
+const timelineEnd = centerX + 100 * DPR;   // Hier hab ich DPR hinzugefügt
 const timelineLength = timelineEnd - timelineStart;
 
 // Datumskonfiguration und Interaktion
@@ -124,6 +168,7 @@ function getDaysInMonth() {
 
 function updateDisplay() {
     const daysInMonth = getDaysInMonth();
+    
     // Aktualisiere die Skala
     dayScale = d3.scaleLinear()
         .domain([1, daysInMonth])
@@ -313,43 +358,159 @@ function updateDateDisplay() {
     }
 }
 
+// === Control Panel UI ===
+// Wires up the sidebar elements
+function initControlsUI() {
+    // Grab all interactive elements from index.html.
+  const $ = s => document.querySelector(s);
+  const axisListEl   = $('#axisList');
+  const arrangementEl= $('#arrangement');
+  const axisTypeEl   = $('#axisType');
+  const linkingEl    = $('#linking');
+  const btnUp        = $('#btnUp');
+  const btnDown      = $('#btnDown');
+  const btnRemove    = $('#btnRemove');
+  const btnAddAll    = $('#btnAddAll');
+  const btnReset     = $('#btnReset');
+
+  function notify() { window.onControlsChange(__controlsState); }
+
+  // Called after any structural change (reorder, remove, toggle).
+  function renderAxisList() {
+    axisListEl.innerHTML = '';
+    __controlsState.axes.forEach((ax, i) => {
+      const li = document.createElement('li');
+      li.className = 'axis-item' + (i === __controlsState.selectedIndex ? ' selected' : '');
+      li.dataset.index = i;
+      // Each axis row is clickable to select it.
+
+      const chip = document.createElement('span');
+      chip.className = 'chip';
+      chip.style.background = ax.color;
+
+      const meta = document.createElement('div');
+      meta.className = 'axis-meta';
+      const name = document.createElement('div');
+      name.className = 'axis-name';
+      name.textContent = ax.key;
+      const sub = document.createElement('div');
+      sub.className = 'axis-sub';
+      sub.textContent = (ax.type === 'scroll' ? 'Scroll Axis' : 'Static Axis') + (ax.isTime ? ' • time' : '');
+
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = !!ax.enabled;
+      cb.title = 'Enable/Disable axis';
+      cb.addEventListener('change', (e) => {
+        ax.enabled = e.target.checked;
+        notify();
+      });
+
+      meta.appendChild(name); meta.appendChild(sub);
+      li.appendChild(chip); li.appendChild(meta); li.appendChild(cb);
+
+      li.addEventListener('click', () => {
+        __controlsState.selectedIndex = i;
+        axisTypeEl.value = __controlsState.axes[i].type;
+        renderAxisList();
+      });
+
+      axisListEl.appendChild(li);
+    });
+  }
+
+  // Initial values
+  // Set the dropdowns to reflect the current control state
+  arrangementEl.value = __controlsState.arrangement;
+  linkingEl.value     = __controlsState.linking;
+  axisTypeEl.value    = __controlsState.axes[__controlsState.selectedIndex]?.type ?? 'static';
+
+  // Event bindings: This function binds all event listeners for the control panel elements.
+  arrangementEl.addEventListener('change', (e) => { __controlsState.arrangement = e.target.value; notify(); });
+  linkingEl.addEventListener('change', (e) => { __controlsState.linking = e.target.value; notify(); });
+  axisTypeEl.addEventListener('change', (e) => {
+    const ax = __controlsState.axes[__controlsState.selectedIndex];
+    if (!ax) return;
+    ax.type = e.target.value;
+    ax.isTime = (ax.key === 'Date' && ax.type === 'scroll') || !!ax.isTime;
+    renderAxisList(); notify();
+  });
+  btnUp.addEventListener('click', () => {
+    const i = __controlsState.selectedIndex; if (i <= 0) return;
+    [__controlsState.axes[i-1], __controlsState.axes[i]] = [__controlsState.axes[i], __controlsState.axes[i-1]];
+    __controlsState.selectedIndex = i-1; renderAxisList(); notify();
+  });
+  btnDown.addEventListener('click', () => {
+    const i = __controlsState.selectedIndex; if (i >= __controlsState.axes.length-1) return;
+    [__controlsState.axes[i+1], __controlsState.axes[i]] = [__controlsState.axes[i], __controlsState.axes[i+1]];
+    __controlsState.selectedIndex = i+1; renderAxisList(); notify();
+  });
+  btnRemove.addEventListener('click', () => {
+    if (__controlsState.axes.length <= 1) return;
+    __controlsState.axes.splice(__controlsState.selectedIndex, 1);
+    __controlsState.selectedIndex = Math.max(0, __controlsState.selectedIndex - 1);
+    renderAxisList(); notify();
+  });
+  btnAddAll.addEventListener('click', () => {
+    const existing = new Set(__controlsState.axes.map(a => a.key));
+    DEFAULT_AXES.forEach(ax => { if (!existing.has(ax.key)) __controlsState.axes.push(JSON.parse(JSON.stringify(ax))); });
+    renderAxisList(); notify();
+  });
+  btnReset.addEventListener('click', () => {
+    __controlsState = {
+      arrangement: 'coordinatesWheel',
+      linking: 'none',
+      axes: JSON.parse(JSON.stringify(DEFAULT_AXES)),
+      selectedIndex: 0
+    };
+    arrangementEl.value = __controlsState.arrangement;
+    linkingEl.value     = __controlsState.linking;
+    axisTypeEl.value    = __controlsState.axes[0].type;
+    renderAxisList(); notify();
+  });
+
+  renderAxisList();
+  notify();
+}
+
+
 // Mouse Event Handler
 
 function isOverSliderEdge(x, y) {
-    const sliderWidth = 16;
     const currentStartX = dayScale(startDay);
-    const currentEndX = dayScale(endDay);
+    const currentEndX = dayScale(endDay) + 16; // Slider-Breite berücksichtigen
+    const sliderWidth = 16;
     const edgeWidth = 5;  // Kanten-Griffbreite
     const moveHit = 4;   // Halbbreite des mittleren Move-Griffs für Single-Day (halbe Breite)
 
     // Prüfe, ob der Maus-y innerhalb des Sliders liegt
     if (y >= centerY - sliderWidth / 2 && y <= centerY + sliderWidth / 2) {
-        // Sonderfall: einzelner Tag -> kleine mittlere Fläche als Verschieben behandeln
+        // Sonderfall: einzelner Tag -> ganze Fläche als Verschieben behandeln
         if (currentStartX === currentEndX) {
             // Für einen Ein-Tages-Slider: kleineren mittleren Move-Bereich verwenden
             if (x >= currentStartX + edgeWidth && x <= currentEndX + sliderWidth - edgeWidth) {
                 return 'move';
             }
             // Kanten zum Größenändern bleiben erreichbar: links/rechts innerhalb edgeWidth
-            if (x >= currentStartX - edgeWidth/2 && x < currentStartX + edgeWidth/2) {
+            if (x >= currentStartX && x < currentStartX + edgeWidth) {
                 return 'left';
             }
-            if (x <= currentEndX + sliderWidth + edgeWidth && x > currentEndX + sliderWidth - edgeWidth) {
+            if (x <= currentEndX && x > currentEndX - edgeWidth) {
                 return 'right';
             }
             return null;
         }
 
         // Normaler Bereich: großer Mittelbereich zum Verschieben
-        if (x >= currentStartX + edgeWidth && x <= currentEndX + sliderWidth/2 - edgeWidth) {
+        if (x >= currentStartX + edgeWidth && x <= currentEndX - edgeWidth) {
             return 'move';
         }
 
         // Kanten zum Größenändern
-        if (x >= currentStartX - edgeWidth && x <= currentStartX + edgeWidth/2) {
+        if (x >= currentStartX - edgeWidth && x <= currentStartX + edgeWidth) {
             return 'left';
         }
-        if (x >= currentEndX + sliderWidth/2 - edgeWidth && x <= currentEndX + sliderWidth/2 + edgeWidth) {
+        if (x >= currentEndX - edgeWidth && x <= currentEndX + edgeWidth) {
             return 'right';
         }
     }
@@ -421,27 +582,18 @@ function handleDrag(e) {
 
     switch (dragMode) {
         case 'left':
-            {
-                // Allow collapsing to a single day (allow equality)
-                const newStartDay = clamp(newDay, 1, endDay);
-                if (newStartDay !== startDay) {
-                    startDay = newStartDay;
-                    // Ensure endDay is at least startDay (should already be true)
-                    if (endDay < startDay) endDay = startDay;
-                    updateDateDisplay();
-                }
+            const newStartDay = Math.min(Math.max(1, newDay), endDay - 1);
+            if (newStartDay !== startDay) {
+                startDay = newStartDay;
+                updateDateDisplay();
             }
             break;
             
         case 'right':
-            {
-                // Allow collapsing to a single day (allow equality)
-                const newEndDay = clamp(newDay, startDay, daysInMonth);
-                if (newEndDay !== endDay) {
-                    endDay = newEndDay;
-                    if (startDay > endDay) startDay = endDay;
-                    updateDateDisplay();
-                }
+            const newEndDay = Math.max(Math.min(daysInMonth, newDay), startDay + 1);
+            if (newEndDay !== endDay) {
+                endDay = newEndDay;
+                updateDateDisplay();
             }
             break;
             
@@ -479,6 +631,7 @@ function init() {
 
 // Starte die Anwendung
 init();
+initControlsUI();
 
 // Starte den Render-Loop
 requestAnimationFrame(render);
