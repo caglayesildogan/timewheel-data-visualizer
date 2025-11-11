@@ -55,19 +55,30 @@
       </div>
     </aside>
 
-    <!-- Rechts -->
+    <!-- Rechts: Canvas + Table -->
     <main class="stage">
-      <div>
-        <div class="topbar">
-          <button id="prevMonth">←</button>
-          <div id="dateDisplay"></div>
-          <button id="nextMonth">→</button>
+      <div class="canvas-and-table">
+        <!-- Canvas Section -->
+        <div class="canvas-section">
+          <div class="topbar">
+            <button id="prevMonth">←</button>
+            <div id="dateDisplay"></div>
+            <button id="nextMonth">→</button>
+          </div>
+          <canvas id="glCanvas" width="600" height="600"></canvas>
         </div>
-        <canvas id="glCanvas" width="600" height="600"></canvas>
+
+        <!-- Table Section -->
+        <div class="table-section">
+          <div id="tableContainer" class="table-wrapper">
+            <!-- populated by JavaScript -->
+          </div>
+        </div>
       </div>
     </main>
   </div>
 
+  <script src="readCSV.js"></script>
   <script src="main.js"></script>
 </body>
 </html>
