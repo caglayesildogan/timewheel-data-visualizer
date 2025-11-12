@@ -156,6 +156,9 @@ function updateMonth(delta) {
     
     // Aktualisiere die Anzeige
     updateDateDisplay();
+    
+    // Aktualisiere die Tabelle mit dem neuen Datum
+    updateTableByDate();
 }
 
 function getDaysInMonth() {
@@ -356,6 +359,9 @@ function updateDateDisplay() {
         });
         dateDisplay.textContent = `${startStr} - ${endStr}`;
     }
+    
+    // Aktualisiere die Tabelle mit dem neuen Datum
+    updateTableByDate();
 }
 
 // === Control Panel UI ===
@@ -637,9 +643,131 @@ function init() {
     updateDateDisplay();
 }
 
+// === TABLE VIEW FUNCTIONALITY ===
+let csvData = null;
+let filteredRows = [];
+
+// Helper function to format date as YYYY-MM-DD
+function formatDateAsKey(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+async function initTableView() {
+    try {
+        const parsed = await window.readCSV.loadCSVFromUrl('res/climate_small.csv', ';');
+        csvData = parsed;
+        
+        // Extract first date from CSV and set currentDate
+        if (parsed.rows && parsed.rows.length > 0) {
+            const firstRowDate = parsed.rows[0].Date;
+            if (firstRowDate instanceof Date) {
+                currentDate = new Date(firstRowDate);
+                startDay = currentDate.getDate();
+                endDay = startDay;
+                
+                // Update dayScale for the new month
+                const daysInMonth = getDaysInMonth();
+                dayScale.domain([1, daysInMonth]);
+                updateDateDisplay();
+            }
+        }
+        
+        updateTableByDate();
+    } catch (error) {
+        console.error('Error loading CSV:', error);
+        document.getElementById('tableContainer').innerHTML = 
+            `<p style="color:#e6e6e6; padding:16px;">Error loading CSV: ${error.message}</p>`;
+    }
+}
+
+function updateTableByDate() {
+    if (!csvData) return;
+
+    // Support date ranges: if startDay !== endDay, filter for all days in range
+    const rangeStart = Math.min(startDay, endDay);
+    const rangeEnd = Math.max(startDay, endDay);
+    
+    filteredRows = csvData.rows.filter(row => {
+        if (!row.Date || !(row.Date instanceof Date)) return false;
+        const rowDateKey = formatDateAsKey(row.Date);
+        
+        // Build date range to check against
+        const rowDate = new Date(row.Date);
+        const rowMonth = rowDate.getMonth();
+        const currentMonth = currentDate.getMonth();
+        const rowYear = rowDate.getFullYear();
+        const currentYear = currentDate.getFullYear();
+        
+        // Check if row is in the same month/year as currentDate
+        if (rowYear !== currentYear || rowMonth !== currentMonth) {
+            return false;
+        }
+        
+        // Check if row day is within the selected range
+        const rowDay = rowDate.getDate();
+        return rowDay >= rangeStart && rowDay <= rangeEnd;
+    });
+    
+    renderTable();
+}
+
+function renderTable() {
+    if (!csvData) return;
+
+    const container = document.getElementById('tableContainer');
+    
+    if (filteredRows.length === 0) {
+        container.innerHTML = '<p style="color:#9aa0a6; padding:16px; text-align:center;">Keine Daten für diesen Zeitraum</p>';
+        return;
+    }
+
+    // Build range header
+    const rangeStart = Math.min(startDay, endDay);
+    const rangeEnd = Math.max(startDay, endDay);
+    let rangeInfo = '';
+
+    let html = rangeInfo + '<table><thead><tr>';
+    csvData.columns.forEach(col => {
+        html += `<th>${escapeHtml(col)}</th>`;
+    });
+    html += '</tr></thead><tbody>';
+
+    filteredRows.forEach(row => {
+        html += '<tr>';
+        csvData.columns.forEach(col => {
+            const value = row[col];
+            let displayValue = '';
+            if (value === null || value === undefined) {
+                displayValue = '—';
+            } else if (value instanceof Date) {
+                displayValue = value.toISOString().split('T')[0];
+            } else if (typeof value === 'number') {
+                displayValue = value.toFixed(2);
+            } else {
+                displayValue = String(value);
+            }
+            html += `<td>${escapeHtml(displayValue)}</td>`;
+        });
+        html += '</tr>';
+    });
+
+    html += '</tbody></table>';
+    container.innerHTML = html;
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
 // Starte die Anwendung
 init();
 initControlsUI();
+initTableView();
 
 // Starte den Render-Loop
 requestAnimationFrame(render);
