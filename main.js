@@ -25,14 +25,14 @@ if (!gl) {
 // === CONTROL PANEL STATE (sidebar) ===
 const DEFAULT_AXES = [
   { key: 'Date',              type: 'scroll',  color: '#9ca3af', enabled: true,  isTime: true },
-  { key: 'AvgTemp',           type: 'static',  color: '#ef4444', enabled: true },
-  { key: 'MaxTemp',           type: 'static',  color: '#f59e0b', enabled: true },
-  { key: 'MinTemp',           type: 'static',  color: '#3b82f6', enabled: true },
-  { key: 'Precipitation',     type: 'static',  color: '#eab308', enabled: true },
-  { key: 'RelHumidity',       type: 'static',  color: '#a855f7', enabled: true },
-  { key: 'CloudCover',        type: 'static',  color: '#10b981', enabled: true },
-  { key: 'SunshineDuration',  type: 'static',  color: '#f97316', enabled: true },
-  { key: 'AirPressure',       type: 'static',  color: '#22d3ee', enabled: true }
+  { key: 'AvgTemp',           type: 'static',  color: '#ef4444', enabled: false },
+  { key: 'MaxTemp',           type: 'static',  color: '#f59e0b', enabled: false },
+  { key: 'MinTemp',           type: 'static',  color: '#3b82f6', enabled: false },
+  { key: 'Precipitation',     type: 'static',  color: '#eab308', enabled: false },
+  { key: 'RelHumidity',       type: 'static',  color: '#a855f7', enabled: false },
+  { key: 'CloudCover',        type: 'static',  color: '#10b981', enabled: false },
+  { key: 'SunshineDuration',  type: 'static',  color: '#f97316', enabled: false },
+  { key: 'AirPressure',       type: 'static',  color: '#22d3ee', enabled: false }
 ];
 
 let __controlsState = {
@@ -46,6 +46,8 @@ let __controlsState = {
 // We just replace our local state.
 window.onControlsChange = (st) => {
   __controlsState = JSON.parse(JSON.stringify(st));
+  updateTableByDate();
+  updateAxisHTML();
 };
 
 // Handy for debugging in DevTools:
@@ -263,6 +265,105 @@ function drawCircle(x, y, radius, color) {
     gl.drawArrays(gl.TRIANGLES, 0, segments * 3);
 }
 
+//  RADIAL AXIS HTML OVERLAY
+
+// Get the current axis list from the control panel state
+function getCurrentAxes() {
+  if (typeof window.getControlsState === 'function') {
+    const st = window.getControlsState();
+    if (st && Array.isArray(st.axes)) return st.axes;
+  }
+  if (window.__controlsState && Array.isArray(window.__controlsState.axes)) {
+    return window.__controlsState.axes;
+  }
+  if (typeof __controlsState !== 'undefined' &&
+      __controlsState && Array.isArray(__controlsState.axes)) {
+    return __controlsState.axes;
+  }
+  return [];
+}
+
+// Create a single axis HTML element and place it around the wheel
+function createAxisHTML(ax, index, total) {
+  const container = document.getElementById("wheelContainer");
+  if (!container) return;
+
+  const containerWidth  = container.clientWidth  || 600;
+  const containerHeight = container.clientHeight || 600;
+
+  const centerX = containerWidth  / 2;
+  const centerY = containerHeight / 2;
+
+  // Radius of the circle on which the axes are placed
+  const radius = containerWidth * 0.38; // biraz oynayabilirsin
+
+  // GEOMETRY
+
+  // Radial angle: where the axis center lies relative to the wheel center
+  // index 0: at the top (–90°), others follow clockwise
+  const radialAngle = -Math.PI / 2 + (index / total) * (2 * Math.PI);
+
+  // Tangent angle: make the axis tangent to the circle
+  const tangentAngle = radialAngle + Math.PI / 2; // +90°
+
+  // Axis center point (center of the polygon edge)
+  const cx = centerX + Math.cos(radialAngle) * radius;
+  const cy = centerY + Math.sin(radialAngle) * radius;
+
+  // Axis length (same for all for now; can be varied by index later)
+  const axisLength = containerWidth * 0.35; // gerekirse küçült/büyüt
+
+  // DOM ELEMENT
+
+  const el = document.createElement("div");
+  el.className = "axis-container";
+
+  el.style.position = "absolute";
+  el.style.width  = axisLength + "px";
+  el.style.height = "20px"; // çizgi + label yüksekliği
+
+  // Place the element so that its center (50%, 50%) sits on (cx, cy)
+  el.style.left = (cx - axisLength / 2) + "px";
+  el.style.top  = (cy - 10) + "px"; // 10 = height/2
+
+  el.style.transformOrigin = "50% 50%";
+  el.style.transform = `rotate(${tangentAngle * 180 / Math.PI}deg)`;
+
+  el.innerHTML = `
+    <div class="axis-line"></div>
+    <div class="axis-label">${ax.key}</div>
+  `;
+
+  container.appendChild(el);
+}
+
+// Rebuild all axis HTML elements based on the currently selected attributes
+function updateAxisHTML() {
+  const container = document.getElementById("wheelContainer");
+  if (!container) return;
+
+  // Remove all previous axis containers
+  container.querySelectorAll(".axis-container").forEach(node => node.remove());
+
+  const axes = getCurrentAxes();
+  if (!axes.length) return;
+
+  // Only use static + enabled axes
+  let activeAxes = axes.filter(ax => ax.type === 'static' && ax.enabled);
+
+  // Limit: only render if the number of axes is between 5 and 8
+  if (activeAxes.length < 5 || activeAxes.length > 8) {
+    // For now: if fewer than 5 or more than 8, do not render any axes
+    return;
+  }
+
+  // Use the order from the control panel: index 0 → top, then clockwise around the wheel
+  activeAxes.forEach((ax, i) => {
+    createAxisHTML(ax, i, activeAxes.length);
+  });
+}
+
+
 function render() {
     if (!dayScale) return;  // Warte bis dayScale initialisiert ist
     
@@ -325,7 +426,7 @@ function render() {
         drawLine(endX, centerY - sliderHeight/2, endX + halfSize, centerY + sliderHeight/2, [1, 1, 1, 1], 2);
         drawLine(startX, centerY - sliderHeight/2, endX + halfSize, centerY - sliderHeight/2, [1, 1, 1, 1], 2);
         drawLine(startX, centerY + sliderHeight/2, endX + halfSize, centerY + sliderHeight/2, [1, 1, 1, 1], 2);
-    }
+    } 
 
     requestAnimationFrame(render);
 }
@@ -407,9 +508,16 @@ function initControlsUI() {
       cb.type = 'checkbox';
       cb.checked = !!ax.enabled;
       cb.title = 'Enable/Disable axis';
+
+      // When the checkbox is clicked, prevent the parent <li> click event from being triggered.
+      cb.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+      });   
+
       cb.addEventListener('change', (e) => {
         ax.enabled = e.target.checked;
         notify();
+        updateAxisHTML();
       });
 
       meta.appendChild(name); meta.appendChild(sub);
@@ -659,7 +767,7 @@ async function initTableView() {
     try {
         const parsed = await window.readCSV.loadCSVFromUrl('res/climate_small.csv', ';');
         csvData = parsed;
-        
+
         // Extract first date from CSV and set currentDate
         if (parsed.rows && parsed.rows.length > 0) {
             const firstRowDate = parsed.rows[0].Date;
