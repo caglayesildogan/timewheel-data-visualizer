@@ -25,11 +25,11 @@ if (!gl) {
 // === CONTROL PANEL STATE (sidebar) ===
 const DEFAULT_AXES = [
   { key: 'Date',              type: 'scroll',  color: '#9ca3af', enabled: true,  isTime: true },
-  { key: 'AvgTemp',           type: 'static',  color: '#ef4444', enabled: false },
-  { key: 'MaxTemp',           type: 'static',  color: '#f59e0b', enabled: false },
-  { key: 'MinTemp',           type: 'static',  color: '#3b82f6', enabled: false },
-  { key: 'Precipitation',     type: 'static',  color: '#eab308', enabled: false },
-  { key: 'RelHumidity',       type: 'static',  color: '#a855f7', enabled: false },
+  { key: 'AvgTemp',           type: 'static',  color: '#ef4444', enabled: true },
+  { key: 'MaxTemp',           type: 'static',  color: '#f59e0b', enabled: true },
+  { key: 'MinTemp',           type: 'static',  color: '#3b82f6', enabled: true },
+  { key: 'Precipitation',     type: 'static',  color: '#eab308', enabled: true },
+  { key: 'RelHumidity',       type: 'static',  color: '#a855f7', enabled: true },
   { key: 'CloudCover',        type: 'static',  color: '#10b981', enabled: false },
   { key: 'SunshineDuration',  type: 'static',  color: '#f97316', enabled: false },
   { key: 'AirPressure',       type: 'static',  color: '#22d3ee', enabled: false }
@@ -61,21 +61,24 @@ gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 // Shader Source Code
 const vertexShaderSource = `
     attribute vec2 a_position;
+    attribute vec4 a_color;
+    varying vec4 v_color;
     uniform vec2 u_resolution;
     
     void main() {
         vec2 zeroToOne = a_position / u_resolution;
         vec2 clipSpace = zeroToOne * 2.0 - 1.0;
         gl_Position = vec4(clipSpace.x, -clipSpace.y, 0, 1);
+        v_color = a_color;
     }
 `;
 
 const fragmentShaderSource = `
     precision mediump float;
-    uniform vec4 u_color;
+    varying vec4 v_color;
     
     void main() {
-        gl_FragColor = u_color;
+        gl_FragColor = v_color;
     }
 `;
 
@@ -111,19 +114,20 @@ gl.useProgram(program);
 
 // Attribute und Uniforms Location
 const positionAttributeLocation = gl.getAttribLocation(program, 'a_position');
+const colorAttributeLocation = gl.getAttribLocation(program, 'a_color');
 const resolutionUniformLocation = gl.getUniformLocation(program, 'u_resolution');
-const colorUniformLocation = gl.getUniformLocation(program, 'u_color');
 
 // Buffer für die Position (allocate once)
 const positionBuffer = gl.createBuffer();
+const colorBuffer = gl.createBuffer();
+
+// allocate reasonably large dynamic buffers once (bytes)
+const BUFFER_SIZE = 256 * 1024;
 gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+gl.bufferData(gl.ARRAY_BUFFER, BUFFER_SIZE, gl.DYNAMIC_DRAW);
 
-// allocate a reasonably large dynamic buffer once (bytes)
-gl.bufferData(gl.ARRAY_BUFFER, 256 * 1024, gl.DYNAMIC_DRAW);
-
-// setup attribute pointer once
-gl.enableVertexAttribArray(positionAttributeLocation);
-gl.vertexAttribPointer(positionAttributeLocation, 2, gl.FLOAT, false, 0, 0);
+gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
+gl.bufferData(gl.ARRAY_BUFFER, BUFFER_SIZE, gl.DYNAMIC_DRAW);
 
 // Timeline Konfiguration
 const timelineStart = centerX - 100 * DPR;
@@ -200,8 +204,17 @@ const snapToDay = (x) => {
 // Der Canvas startet im "grab" Modus
 canvas.style.cursor = "grab";
 
-// WebGL Rendering Funktionen
-function drawLine(x1, y1, x2, y2, color, width = 2.0) {
+// === LINE BATCH RENDERING ===
+// Sammelt alle Linien für Batch-Rendering
+let lineBuffer = {
+    vertices: [],
+    colors: [],
+    indices: []
+};
+
+const MAX_VERTICES = 65536;
+
+function addLineToBuffer(x1, y1, x2, y2, color, width = 2.0) {
     // Berechne die Richtung und Länge der Linie
     const dx = x2 - x1;
     const dy = y2 - y1;
@@ -213,26 +226,62 @@ function drawLine(x1, y1, x2, y2, color, width = 2.0) {
     const wx = (width / 2) * sina;
     const wy = (width / 2) * cosa;
     
-    // Definiere die Vertices für das Rechteck
-    const vertices = new Float32Array([
-        x1 - wx, y1 + wy,  // links oben
-        x1 + wx, y1 - wy,  // links unten
-        x2 - wx, y2 + wy,  // rechts oben
-        x2 + wx, y2 - wy   // rechts unten
-    ]);
+    // Vertices für das Rechteck (4 Punkte pro Linie)
+    const v1 = [x1 - wx, y1 + wy];
+    const v2 = [x1 + wx, y1 - wy];
+    const v3 = [x2 - wx, y2 + wy];
+    const v4 = [x2 + wx, y2 - wy];
+    
+    // Füge Vertices hinzu
+    const startIndex = lineBuffer.vertices.length / 2;
+    lineBuffer.vertices.push(...v1, ...v2, ...v3, ...v4);
+    
+    // Füge Farben hinzu (für jeden Vertex die gleiche Farbe)
+    for (let i = 0; i < 4; i++) {
+        lineBuffer.colors.push(...color);
+    }
+    
+    // Füge Indices hinzu für TRIANGLE_STRIP
+    lineBuffer.indices.push(
+        startIndex,
+        startIndex + 1,
+        startIndex + 2,
+        startIndex + 3
+    );
+}
 
-    // Buffer und Attribute aktualisieren
+// Funktion zum Rendern aller gesammelten Linien
+function flushLineBuffer() {
+    if (lineBuffer.vertices.length === 0) return;
+    
+    const vertexArray = new Float32Array(lineBuffer.vertices);
+    const colorArray = new Float32Array(lineBuffer.colors);
+    
+    // Position Buffer aktualisieren
     gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+    gl.bufferData(gl.ARRAY_BUFFER, vertexArray.byteLength, gl.DYNAMIC_DRAW);
+    gl.bufferSubData(gl.ARRAY_BUFFER, 0, vertexArray);
+    
     gl.enableVertexAttribArray(positionAttributeLocation);
     gl.vertexAttribPointer(positionAttributeLocation, 2, gl.FLOAT, false, 0, 0);
     
-    // Uniforms setzen
-    gl.uniform2f(resolutionUniformLocation, canvas.width, canvas.height);
-    gl.uniform4fv(colorUniformLocation, color);
+    // Color Buffer aktualisieren
+    gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, colorArray.byteLength, gl.DYNAMIC_DRAW);
+    gl.bufferSubData(gl.ARRAY_BUFFER, 0, colorArray);
     
-    // Zeichnen
-    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    gl.enableVertexAttribArray(colorAttributeLocation);
+    gl.vertexAttribPointer(colorAttributeLocation, 4, gl.FLOAT, false, 0, 0);
+    
+    gl.uniform2f(resolutionUniformLocation, canvas.width, canvas.height);
+    
+    // Zeichne alle Linien in einem Batch
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, lineBuffer.vertices.length / 2);
+    
+    // Buffer leeren für nächsten Frame
+    lineBuffer.vertices = [];
+    lineBuffer.colors = [];
+    lineBuffer.indices = [];
 }
 
 // Funktion zum Zeichnen eines gefüllten Kreises
@@ -351,6 +400,9 @@ function updateAxisHTML() {
   // Only use static + enabled axes
   let activeAxes = axes.filter(ax => ax.type === 'static' && ax.enabled);
 
+  // Debug log
+  console.log('updateAxisHTML - activeAxes:', activeAxes.map(a => a.key));
+
   // Limit: only render if the number of axes is between 5 and 8
   if (activeAxes.length < 5 || activeAxes.length > 8) {
     // For now: if fewer than 5 or more than 8, do not render any axes
@@ -373,15 +425,15 @@ function render() {
     gl.clear(gl.COLOR_BUFFER_BIT);
 
     // Hauptlinie (Timeline) zeichnen
-    drawLine(timelineStart, centerY, timelineEnd - 15, centerY, [1, 1, 1, 1], 3);
+    addLineToBuffer(timelineStart, centerY, timelineEnd - 15, centerY, [1, 1, 1, 1], 3);
 
     // Pfeilspitze am Ende der Timeline
     const arrowSize = 15;
-    drawLine(timelineEnd, centerY, timelineEnd - arrowSize, centerY - arrowSize/2, [1, 1, 1, 1], 3);
-    drawLine(timelineEnd, centerY, timelineEnd - arrowSize, centerY + arrowSize/2, [1, 1, 1, 1], 3);
+    addLineToBuffer(timelineEnd, centerY, timelineEnd - arrowSize, centerY - arrowSize/2, [1, 1, 1, 1], 3);
+    addLineToBuffer(timelineEnd, centerY, timelineEnd - arrowSize, centerY + arrowSize/2, [1, 1, 1, 1], 3);
 
     // Vertikaler Strich am Anfang der Timeline
-    drawLine(timelineStart, centerY - 10, timelineStart, centerY + 10, [1, 1, 1, 1], 2);
+    addLineToBuffer(timelineStart, centerY - 10, timelineStart, centerY + 10, [1, 1, 1, 1], 2);
 
     // Tagesmarkierungen zeichnen
     const daysInMonth = getDaysInMonth();
@@ -390,10 +442,10 @@ function render() {
         
         if (day % 5 === 0) {
             // Etwas längere Markierung für jeden 5. Tag
-            drawLine(x, centerY - 7, x, centerY + 7, [0.4, 0.4, 0.4, 1], 1);
+            addLineToBuffer(x, centerY - 7, x, centerY + 7, [0.4, 0.4, 0.4, 1], 1);
         } else {
             // Normale Tagesmarkierung
-            drawLine(x, centerY - 5, x, centerY + 5, [0.4, 0.4, 0.4, 1], 1);
+            addLineToBuffer(x, centerY - 5, x, centerY + 5, [0.4, 0.4, 0.4, 1], 1);
         }
     }
 
@@ -404,29 +456,32 @@ function render() {
     const halfSize = sliderHeight / 2;
     
     // Debug-Ausgabe
-    console.log('Slider Position:', { startDay, endDay, startX, endX });
+    // console.log('Slider Position:', { startDay, endDay, startX, endX });
     
     if (startX === endX) {
         // Einzelner Tag - zeichne quadratischen Slider
         
-        drawLine(startX , centerY, endX + sliderHeight, centerY, [1, 1, 1, 1], sliderHeight);
+        addLineToBuffer(startX , centerY, endX + sliderHeight, centerY, [1, 1, 1, 1], sliderHeight);
         
         // Weiße Kanten
-        drawLine(startX, centerY - sliderHeight/2, startX + sliderHeight, centerY + sliderHeight/2, [1, 1, 1, 1], 2);
-        drawLine(startX, centerY - sliderHeight/2, startX + sliderHeight, centerY + sliderHeight/2, [1, 1, 1, 1], 2);
-        drawLine(startX, centerY - sliderHeight/2, startX + sliderHeight, centerY - sliderHeight/2, [1, 1, 1, 1], 2);
-        drawLine(startX, centerY + sliderHeight/2, startX + sliderHeight, centerY + sliderHeight/2, [1, 1, 1, 1], 2);
+        addLineToBuffer(startX, centerY - sliderHeight/2, startX + sliderHeight, centerY + sliderHeight/2, [1, 1, 1, 1], 2);
+        addLineToBuffer(startX, centerY - sliderHeight/2, startX + sliderHeight, centerY + sliderHeight/2, [1, 1, 1, 1], 2);
+        addLineToBuffer(startX, centerY - sliderHeight/2, startX + sliderHeight, centerY - sliderHeight/2, [1, 1, 1, 1], 2);
+        addLineToBuffer(startX, centerY + sliderHeight/2, startX + sliderHeight, centerY + sliderHeight/2, [1, 1, 1, 1], 2);
     } else {
         // Zeitraum - zeichne ausgedehnten Slider
         // Grauer Hintergrund
-        drawLine(startX, centerY, endX + halfSize, centerY, [1, 1, 1, 1], sliderHeight);
+        addLineToBuffer(startX, centerY, endX + halfSize, centerY, [1, 1, 1, 1], sliderHeight);
         
         // Weiße Kanten
-        drawLine(startX, centerY - sliderHeight/2, startX + halfSize, centerY + sliderHeight/2, [1, 1, 1, 1], 2);
-        drawLine(endX, centerY - sliderHeight/2, endX + halfSize, centerY + sliderHeight/2, [1, 1, 1, 1], 2);
-        drawLine(startX, centerY - sliderHeight/2, endX + halfSize, centerY - sliderHeight/2, [1, 1, 1, 1], 2);
-        drawLine(startX, centerY + sliderHeight/2, endX + halfSize, centerY + sliderHeight/2, [1, 1, 1, 1], 2);
+        addLineToBuffer(startX, centerY - sliderHeight/2, startX + halfSize, centerY + sliderHeight/2, [1, 1, 1, 1], 2);
+        addLineToBuffer(endX, centerY - sliderHeight/2, endX + halfSize, centerY + sliderHeight/2, [1, 1, 1, 1], 2);
+        addLineToBuffer(startX, centerY - sliderHeight/2, endX + halfSize, centerY - sliderHeight/2, [1, 1, 1, 1], 2);
+        addLineToBuffer(startX, centerY + sliderHeight/2, endX + halfSize, centerY + sliderHeight/2, [1, 1, 1, 1], 2);
     } 
+
+    // Flush all lines to render them in one batch
+    flushLineBuffer();
 
     requestAnimationFrame(render);
 }
@@ -585,6 +640,7 @@ function initControlsUI() {
 
   renderAxisList();
   notify();
+  updateAxisHTML(); // ← Render the axis wheel initially
 }
 
 
@@ -595,7 +651,6 @@ function isOverSliderEdge(x, y) {
     const currentEndX = dayScale(endDay);
     const sliderWidth = 16;
     const edgeWidth = 5;  // Kanten-Griffbreite
-    const moveHit = 4;   // Halbbreite des mittleren Move-Griffs für Single-Day (halbe Breite)
 
     // Prüfe, ob der Maus-y innerhalb des Sliders liegt
     if (y >= centerY - sliderWidth / 2 && y <= centerY + sliderWidth / 2) {
