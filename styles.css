@@ -226,3 +226,15 @@ tr:hover {
   color: #f5f5f5;
   white-space: nowrap;
 }
+
+/* Projection marker: small thin line positioned along the axis container */
+.axis-projection {
+  position: absolute;
+  top: 50%;
+  width: 2px;
+  height: 12px;
+  transform: translate(-50%, -50%);
+  background: #fff;
+  display: none;
+  pointer-events: none;
+}

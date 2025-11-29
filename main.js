@@ -226,28 +226,26 @@ function addLineToBuffer(x1, y1, x2, y2, color, width = 2.0) {
     const wx = (width / 2) * sina;
     const wy = (width / 2) * cosa;
     
-    // Vertices für das Rechteck (4 Punkte pro Linie)
+    // Vertices für das Rechteck (4 Punkte per quad)
     const v1 = [x1 - wx, y1 + wy];
     const v2 = [x1 + wx, y1 - wy];
     const v3 = [x2 - wx, y2 + wy];
     const v4 = [x2 + wx, y2 - wy];
-    
-    // Füge Vertices hinzu
-    const startIndex = lineBuffer.vertices.length / 2;
-    lineBuffer.vertices.push(...v1, ...v2, ...v3, ...v4);
-    
+
+    // For batching without connecting strips, emit two triangles (6 vertices)
+    // Triangle A: v1, v2, v3
+    // Triangle B: v2, v4, v3
+    lineBuffer.vertices.push(...v1, ...v2, ...v3, ...v2, ...v4, ...v3);
+
     // Füge Farben hinzu (für jeden Vertex die gleiche Farbe)
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 6; i++) {
         lineBuffer.colors.push(...color);
     }
-    
-    // Füge Indices hinzu für TRIANGLE_STRIP
-    lineBuffer.indices.push(
-        startIndex,
-        startIndex + 1,
-        startIndex + 2,
-        startIndex + 3
-    );
+
+    // indices are not used currently but keep for possible future indexed rendering
+    // (push indices for completeness if needed)
+    const startIndex = (lineBuffer.vertices.length / 2) - 6;
+    lineBuffer.indices.push(startIndex, startIndex + 1, startIndex + 2, startIndex + 3, startIndex + 4, startIndex + 5);
 }
 
 // Funktion zum Rendern aller gesammelten Linien
@@ -275,8 +273,8 @@ function flushLineBuffer() {
     
     gl.uniform2f(resolutionUniformLocation, canvas.width, canvas.height);
     
-    // Zeichne alle Linien in einem Batch
-    gl.drawArrays(gl.TRIANGLE_STRIP, 0, lineBuffer.vertices.length / 2);
+    // Zeichne alle Linien in einem Batch (verwende TRIANGLES, da wir separate Quads emittieren)
+    gl.drawArrays(gl.TRIANGLES, 0, lineBuffer.vertices.length / 2);
     
     // Buffer leeren für nächsten Frame
     lineBuffer.vertices = [];
@@ -350,6 +348,7 @@ function createAxisHTML(ax, index, total) {
 
   // Radial angle: where the axis center lies relative to the wheel center
   // index 0: at the top (–90°), others follow clockwise
+  // add variable for rotation via control panel later if needed
   const radialAngle = -Math.PI / 2 + (index / total) * (2 * Math.PI);
 
   // Tangent angle: make the axis tangent to the circle
@@ -382,6 +381,9 @@ function createAxisHTML(ax, index, total) {
     <div class="axis-line"></div>
     <div class="axis-label">${ax.key}</div>
   `;
+
+    // expose the axis key on the DOM element for projection logic
+    el.dataset.key = ax.key;
 
   container.appendChild(el);
 }
@@ -480,6 +482,25 @@ function render() {
         addLineToBuffer(startX, centerY + sliderHeight/2, endX + halfSize, centerY + sliderHeight/2, [1, 1, 1, 1], 2);
     } 
 
+    // Draw axis projection markers (from axisProjection) as small perpendicular ticks
+    try {
+        const container = document.getElementById('wheelContainer');
+        const cw = container ? container.clientWidth || 600 : 600;
+        const ch = container ? container.clientHeight || 600 : 600;
+        if (window.axisProjection && csvData) {
+            const projections = window.axisProjection.getProjections(currentDate, startDay, endDay, csvData, getCurrentAxes(), cw, ch);
+            // draw connection lines from marker midpoint to timeline x
+            const timelineX = dayScale(startDay);
+            projections.forEach(p => {
+                // connection color: same as axis but semi-transparent
+                const connColor = [p.color[0], p.color[1], p.color[2], 0.7];
+                addLineToBuffer(p.px, p.py, timelineX, centerY, connColor, 1);
+            });
+        }
+    } catch (e) {
+        console.warn('projection draw error', e);
+    }
+    
     // Flush all lines to render them in one batch
     flushLineBuffer();
 
@@ -518,6 +539,10 @@ function updateDateDisplay() {
     
     // Aktualisiere die Tabelle mit dem neuen Datum
     updateTableByDate();
+    // Update projections for the (new) selected date
+    if (window.axisProjection) {
+        window.axisProjection.getProjections(currentDate, startDay, endDay, csvData);
+    }
 }
 
 // === Control Panel UI ===
@@ -838,6 +863,11 @@ async function initTableView() {
             }
         }
         
+        // compute ranges for axes and update projections
+        if (window.axisProjection) {
+            window.axisProjection.computeRanges(csvData, getCurrentAxes());
+            window.axisProjection.getProjections(currentDate, startDay, endDay, csvData);
+        }
         updateTableByDate();
     } catch (error) {
         console.error('Error loading CSV:', error);
