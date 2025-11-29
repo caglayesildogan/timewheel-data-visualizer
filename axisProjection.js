@@ -38,7 +38,7 @@
 
   // helper to find the CSV row that matches a JS Date (year, month, day)
   /// FIXME: needs to be advanced to handle date ranges
-  function findRowForDate(csvData, date) {
+  function findOne(csvData, date) {
     if (!csvData || !Array.isArray(csvData.rows)) return null;
     for (let i = 0; i < csvData.rows.length; i++) {
       const r = csvData.rows[i];
@@ -49,6 +49,28 @@
     return null;
   }
 
+  function findAll(csvData, startDate, endDate) {
+    const out = [];
+    if (!csvData || !Array.isArray(csvData.rows)) return out;
+
+    const start = startDate.getTime();
+    const end = endDate.getTime();
+
+    for (let i = 0; i < csvData.rows.length; i++) {
+      const r = csvData.rows[i];
+      const d = r.Date;
+
+      if (!(d instanceof Date)) continue;
+
+      const t = d.getTime();
+      if (t >= start && t <= end) {
+        out.push(r);
+      }
+    }
+    return out;
+  }
+
+
   // produce projection line geometry for the currently selected date
   // axes: array of axis descriptors (only static+enabled will be used)
   // containerWidth/Height: pixel size of the wheel container
@@ -57,11 +79,26 @@
     const out = [];
     if (!csvData || !axes) return out;
 
-    /// FIXME: needs to be advanced to handle date ranges
-    const selDate = new Date(currentDate);
-    selDate.setDate(startDay);
-    const row = findRowForDate(csvData, selDate);
-    if (!row) return out;
+    let rows = [];
+    let row = null;
+
+    if (startDay !== endDay) {
+      // Zeitraum
+      const startDate = new Date(currentDate);
+      const endDate = new Date(currentDate);
+      startDate.setDate(startDay);
+      endDate.setDate(endDay);
+
+      rows = findAll(csvData, startDate, endDate);
+      if (!rows || rows.length === 0) return out;
+
+    } else {
+      // Einzelnes Datum
+      const selDate = new Date(currentDate);
+      selDate.setDate(startDay);
+      row = findOne(csvData, selDate);
+      if (!row) return out;
+    }
 
     // Determine active axes (preserve order)
     const activeAxes = axes.filter(ax => ax.type === 'static' && ax.enabled);
@@ -75,35 +112,45 @@
 
     activeAxes.forEach((ax, index) => {
       const key = ax.key;
-      if (!(key in ranges)) return; // no numeric range
-
+      if (!(key in ranges)) return;
+    
       const { min, max } = ranges[key];
-      const value = safeNumber(row[key]);
-      if (value === null) return;
-
-      // compute axis geometry (match createAxisHTML)
-      // add variable for rotation via control panel later if needed
+    
+      // welcher Fall?
+      const valueList = (startDay !== endDay)
+          ? rows.map(r => safeNumber(r[key])).filter(v => v !== null)
+          : [ safeNumber(row[key]) ];
+    
+      if (valueList.length === 0) return;
+    
+      // Geometrie der Achse
       const radialAngle = -Math.PI / 2 + (index / total) * (2 * Math.PI);
-      const tangentAngle = radialAngle + Math.PI / 2; // axis direction
+      const tangentAngle = radialAngle + Math.PI / 2;
+    
       const cx = centerX + Math.cos(radialAngle) * radius;
       const cy = centerY + Math.sin(radialAngle) * radius;
-
-      // compute normalized position along axis [0..1]
-      const t = (min === max) ? 0.5 : (value - min) / (max - min);
-      const clamped = Math.min(Math.max(t, 0), 1);
-
-      // local coordinate along axis: from -axisLength/2 .. +axisLength/2
-      const localX = -axisLength / 2 + clamped * axisLength;
-      const localY = -6; // offset for marker placement
-
-      // rotate local point by tangentAngle and translate by cx,cy
-      const px = cx + localX * Math.cos(tangentAngle) - localY * Math.sin(tangentAngle);
-      const py = cy + localX * Math.sin(tangentAngle) + localY * Math.cos(tangentAngle);
-
-      // convert color hex to rgba array (0..1)
+    
       const color = hexToRgba(ax.color || '#ffffff', 1.0);
-
-      out.push({ px, py, color, key });
+    
+      // Für jeden Wert eine Projektion erzeugen
+      valueList.forEach((value, idx) => {
+        const r = rows[idx];
+        if (!r || !(r.Date instanceof Date)) return;
+      
+        const t = (min === max) ? 0.5 : (value - min) / (max - min);
+        const clamped = Math.min(Math.max(t, 0), 1);
+      
+        const localX = -axisLength / 2 + clamped * axisLength;
+        const localY = -6;
+      
+        const px = cx + localX * Math.cos(tangentAngle) - localY * Math.sin(tangentAngle);
+        const py = cy + localX * Math.sin(tangentAngle) + localY * Math.cos(tangentAngle);
+      
+        out.push({
+          px, py, color, key,
+          date: r.Date   // ← Datum mitgeben
+        });
+      });
     });
 
     return out;

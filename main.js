@@ -482,16 +482,18 @@ function render() {
         addLineToBuffer(startX, centerY + sliderHeight/2, endX + halfSize, centerY + sliderHeight/2, [1, 1, 1, 1], 2);
     } 
 
-    // Draw axis projection markers (from axisProjection) as small perpendicular ticks
+    // Draw axis projection lines
     try {
         const container = document.getElementById('wheelContainer');
         const cw = container ? container.clientWidth || 600 : 600;
         const ch = container ? container.clientHeight || 600 : 600;
         if (window.axisProjection && csvData) {
             const projections = window.axisProjection.getProjections(currentDate, startDay, endDay, csvData, getCurrentAxes(), cw, ch);
-            // draw connection lines from marker midpoint to timeline x
-            const timelineX = dayScale(startDay);
             projections.forEach(p => {
+                const date = p.date instanceof Date ? p.date : null;
+                if (!date) return;  
+                
+                const timelineX = dayScale(date.getDate());  // ← dynamisch
                 // connection color: same as axis but semi-transparent
                 const connColor = [p.color[0], p.color[1], p.color[2], 0.7];
                 addLineToBuffer(p.px, p.py, timelineX, centerY, connColor, 1);
