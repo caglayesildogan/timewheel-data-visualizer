@@ -124,7 +124,9 @@
       if (valueList.length === 0) return;
     
       // Geometrie der Achse
-      const radialAngle = -Math.PI / 2 + (index / total) * (2 * Math.PI);
+      const rotationDeg = window.axisOverlay ? window.axisOverlay.getRotationDeg() : 0;
+      const rotationRad = rotationDeg * Math.PI / 180;
+      const radialAngle = -Math.PI / 2 + rotationRad + (index / total) * (2 * Math.PI);
       const tangentAngle = radialAngle + Math.PI / 2;
     
       const cx = centerX + Math.cos(radialAngle) * radius;
@@ -134,18 +136,19 @@
     
       // Für jeden Wert eine Projektion erzeugen
       valueList.forEach((value, idx) => {
-        const r = rows[idx];
+        // In range-case benutzen wir rows[idx], bei Einzel-Datum benutzen wir die variable `row`
+        const r = (startDay !== endDay) ? rows[idx] : row;
         if (!r || !(r.Date instanceof Date)) return;
-      
+
         const t = (min === max) ? 0.5 : (value - min) / (max - min);
         const clamped = Math.min(Math.max(t, 0), 1);
-      
+
         const localX = -axisLength / 2 + clamped * axisLength;
         const localY = -6;
-      
+
         const px = cx + localX * Math.cos(tangentAngle) - localY * Math.sin(tangentAngle);
         const py = cy + localX * Math.sin(tangentAngle) + localY * Math.cos(tangentAngle);
-      
+
         out.push({
           px, py, color, key,
           date: r.Date   // ← Datum mitgeben
