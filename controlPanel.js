@@ -11,7 +11,9 @@
     { key: 'RelHumidity',       type: 'static',  color: '#a855f7', enabled: true },
     { key: 'CloudCover',        type: 'static',  color: '#10b981', enabled: false },
     { key: 'SunshineDuration',  type: 'static',  color: '#f97316', enabled: false },
-    { key: 'AirPressure',       type: 'static',  color: '#22d3ee', enabled: false }
+    { key: 'AirPressure',       type: 'static',  color: '#22d3ee', enabled: false },
+    { key: 'Wind',              type: 'static',  color: '#8b5cf6', enabled: false },
+    { key: 'VaporContent',      type: 'static',  color: '#ec4899', enabled: false }
   ];
 
   let __controlsState = {
@@ -80,7 +82,29 @@
 
         cb.addEventListener('click', (ev) => { ev.stopPropagation(); });
 
+        const MAX_STATIC_AXES = 8;
+        const MIN_STATIC_AXES = 5;
         cb.addEventListener('change', (e) => {
+          const willEnable = e.target.checked;
+
+          // Only limit "static" axes (attributes). Date/scroll is not counted.
+          if (ax.type === 'static') {
+            const enabledStaticCount = __controlsState.axes.filter(a => a.type === 'static' && a.enabled).length;
+
+            // MIN: If already 5 static axes enabled, block disabling the 5th
+            if (!willEnable && enabledStaticCount <= MIN_STATIC_AXES) {
+              e.target.checked = true; // revert checkbox
+              alert(`Minimum ${MIN_STATIC_AXES} attributes must be selected.`);
+              return;
+            }
+
+            // MAX: If already 8 static axes enabled, block enabling the 9th
+            if (willEnable && enabledStaticCount >= MAX_STATIC_AXES) {
+              e.target.checked = false; // revert checkbox
+              alert(`Maximum ${MAX_STATIC_AXES} attributes can be selected.`);
+              return;
+            }
+          }
           ax.enabled = e.target.checked;
           notify();
           updateAxisHTML();
@@ -140,8 +164,14 @@
         arrangement: 'coordinatesWheel',
         linking: 'none',
         axes: JSON.parse(JSON.stringify(DEFAULT_AXES)),
-        selectedIndex: 0
+        selectedIndex: 0                   
       };
+      // Reset rotation slider
+      const rot = document.getElementById('rotationSlider');  
+      const rotVal = document.getElementById('rotationValue');
+      if (rot) rot.value = 0;
+      if (rotVal) rotVal.textContent = '0°';
+
       arrangementEl.value = __controlsState.arrangement;
       linkingEl.value     = __controlsState.linking;
       axisTypeEl.value    = __controlsState.axes[0].type;

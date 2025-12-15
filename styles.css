@@ -275,7 +275,9 @@ input[type="range"]#rotationSlider:focus::-webkit-slider-thumb {
 }
 
 /* Disable default focus outline for consistency */
-input[type="range"]#rotationSlider:focus { outline: none; }
+input[type="range"]#rotationSlider:focus { 
+  outline: none; 
+}
 
 /* Rotation control classes moved from inline styles */
 .rotation-container {
@@ -296,3 +298,23 @@ input[type="range"]#rotationSlider:focus { outline: none; }
   pointer-events: auto;
 }
 
+/* Inline warning message below the axis list */
+.axis-warning {
+  margin-top:8px;
+  padding:8px 10px;
+  border-radius:8px;
+  border:1px solid rgba(239, 68, 68, 0.35);
+  background: rgba(239, 68, 68, 0.12);
+  color: #fecaca;
+  font-size:12px;
+  line-height:1.2;
+  opacity:0;
+  transform: translateY(-4px);
+  transition: opacity 160ms ease, transform 160ms ease;
+  pointer-events:none;
+}
+
+.axis-warning.show {
+  opacity:1;
+  transform: translateY(0);
+}
