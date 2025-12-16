@@ -3,17 +3,17 @@
 
   // === CONTROL PANEL STATE (sidebar) ===
   const DEFAULT_AXES = [
-    { key: 'Date',              type: 'scroll',  color: '#9ca3af', enabled: true,  isTime: true },
-    { key: 'AvgTemp',           type: 'static',  color: '#ef4444', enabled: true },
-    { key: 'MaxTemp',           type: 'static',  color: '#f59e0b', enabled: true },
-    { key: 'MinTemp',           type: 'static',  color: '#3b82f6', enabled: true },
-    { key: 'Precipitation',     type: 'static',  color: '#eab308', enabled: true },
-    { key: 'RelHumidity',       type: 'static',  color: '#a855f7', enabled: true },
-    { key: 'CloudCover',        type: 'static',  color: '#10b981', enabled: false },
-    { key: 'SunshineDuration',  type: 'static',  color: '#f97316', enabled: false },
-    { key: 'AirPressure',       type: 'static',  color: '#22d3ee', enabled: false },
-    { key: 'Wind',              type: 'static',  color: '#8b5cf6', enabled: false },
-    { key: 'VaporContent',      type: 'static',  color: '#ec4899', enabled: false }
+    { key: 'Date',              type: 'scroll',  color: '#9ca3af',   enabled: true,  isTime: true },
+    { key: 'AvgTemp',           type: 'static',  color: '#ef4444',   enabled: true },
+    { key: 'MaxTemp',           type: 'static',  color: '#f59e0b',   enabled: true },
+    { key: 'MinTemp',           type: 'static',  color: '#3b82f6',   enabled: true },
+    { key: 'Precipitation',     type: 'static',  color: '#eab308',   enabled: true },
+    { key: 'RelHumidity',       type: 'static',  color: '#a855f7',   enabled: true },
+    { key: 'CloudCover',        type: 'static',  color: '#25bd32ff', enabled: false },
+    { key: 'SunshineDuration',  type: 'static',  color: '#e3680bff', enabled: false },
+    { key: 'AirPressure',       type: 'static',  color: '#22d3ee',   enabled: false },
+    { key: 'Wind',              type: 'static',  color: '#0d4912ff', enabled: false },
+    { key: 'VaporContent',      type: 'static',  color: '#ec4899',   enabled: false }
   ];
 
   let __controlsState = {
@@ -107,7 +107,7 @@
           }
           ax.enabled = e.target.checked;
           notify();
-          updateAxisHTML();
+          updateAxisHTML();        
         });
 
         meta.appendChild(name); meta.appendChild(sub);

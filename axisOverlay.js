@@ -56,7 +56,7 @@
     const cy = centerY + Math.sin(radialAngle) * radius;
 
     // Axis length
-    const axisLength = containerWidth * 0.35;
+    const axisLength = 2 * radius * Math.tan(Math.PI / total) + 2;
 
     // DOM ELEMENT
     const el = document.createElement("div");
