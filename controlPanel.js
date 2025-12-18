@@ -21,7 +21,8 @@
     linking: 'none',
     axes: JSON.parse(JSON.stringify(DEFAULT_AXES)),
     selectedIndex: 0,
-    rotation: 0 // degrees, 0..360 - controls the radial rotation of axes
+    rotation: 0, // degrees, 0..360 - controls the radial rotation of axes
+    magnification: 0 // 0..100 - controls the size of the wheel
   };
 
   // Expose __controlsState to window for use in other modules
@@ -220,6 +221,59 @@
         document.body.appendChild(rotationContainer);
       }
     })();
+
+    // Reset magnification slider
+    const mag = document.getElementById('magnificationSlider');
+    const magVal = document.getElementById('magnificationValue');
+    if (mag) mag.value = 0;
+    if (magVal) magVal.textContent = '0%';
+    __controlsState.magnification = 0;
+
+    // Magnification slider (0..100%)
+    (function createMagnificationControl(){
+      const magnContainer = document.createElement('div');
+      magnContainer.className = 'control-row magnification-container';
+
+      const lbl = document.createElement('label');
+      lbl.htmlFor = 'magnificationSlider';
+      lbl.className = 'magnification-label';
+      lbl.textContent = 'Magnification:';
+
+      const valueSpan = document.createElement('span');
+      valueSpan.id = 'magnificationValue';
+      valueSpan.className = 'magnification-value';
+      valueSpan.textContent = String(__controlsState.magnification || 0) + '%';
+
+      const slider = document.createElement('input');
+      slider.type = 'range';
+      slider.id = 'magnificationSlider';
+      slider.min = 0;
+      slider.max = 100;
+      slider.step = 1;
+      slider.value = __controlsState.magnification || 0;
+      slider.className = 'magnification-slider';
+
+      slider.addEventListener('input', (e) => {
+        const v = Number(e.target.value);
+        __controlsState.magnification = v;
+        valueSpan.textContent = v + '%';
+        notify();
+        updateAxisHTML();
+      });
+
+      magnContainer.appendChild(lbl);
+      magnContainer.appendChild(slider);
+      magnContainer.appendChild(valueSpan);
+
+      try {
+        const rot = document.getElementById('rotationSlider');
+        if (rot && rot.parentElement) rot.parentElement.insertAdjacentElement('afterend', magnContainer);
+        else arrangementEl.insertAdjacentElement('afterend', magnContainer);
+      } catch (err) {
+        document.body.appendChild(magnContainer);
+      }
+    })();
+
 
     renderAxisList();
     notify();
