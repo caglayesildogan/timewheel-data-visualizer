@@ -30,9 +30,12 @@
     const timelineStart = dateInt.getTimelineStart();
     const timelineEnd = dateInt.getTimelineEnd();
     const dayScale = dateInt.getDayScale();
-    const startDay = dateInt.getStartDay();
-    const endDay = dateInt.getEndDay();
     const currentDate = dateInt.getCurrentDate();
+    const startDate = dateInt.getStartDate ? dateInt.getStartDate() : null;
+    const endDate = dateInt.getEndDate ? dateInt.getEndDate() : null;
+    const tickCount = dateInt.getTickCount ? dateInt.getTickCount() : dateInt.getDaysInMonth();
+    const startTick = dateInt.getStartDay();
+    const endTick = dateInt.getEndDay();
 
     // Draw timeline base line
     renderer.addLineToBuffer(timelineStart, centerY, timelineEnd - 15, centerY, [1, 1, 1, 1], 3);
@@ -45,23 +48,19 @@
     // Draw left end cap
     renderer.addLineToBuffer(timelineStart, centerY - 10, timelineStart, centerY + 10, [1, 1, 1, 1], 2);
 
-    // Draw day markers
-    const daysInMonth = dateInt.getDaysInMonth();
-    for (let day = 1; day <= daysInMonth; day++) {
-      const x = dayScale(day);
-      
-      if (day % 5 === 0) {
-        // Slightly longer marker for every 5th day
+    // Draw timeline markers (tick-based: days, months, or months across years)
+    for (let t = 1; t <= tickCount; t++) {
+      const x = dayScale(t);
+      if (t % Math.max(1, Math.floor(tickCount/12)) === 0) {
         renderer.addLineToBuffer(x, centerY - 7, x, centerY + 7, [0.4, 0.4, 0.4, 1], 1);
       } else {
-        // Regular marker
         renderer.addLineToBuffer(x, centerY - 5, x, centerY + 5, [0.4, 0.4, 0.4, 1], 1);
       }
     }
 
     // Draw selected day range slider
-    const startX = dayScale(startDay);
-    const endX = dayScale(endDay);
+    const startX = dayScale(startTick);
+    const endX = dayScale(endTick);
     const sliderHeight = 16;
     const halfSize = sliderHeight / 2;
     
@@ -91,12 +90,12 @@
       const cw = container ? container.clientWidth || 600 : 600;
       const ch = container ? container.clientHeight || 600 : 600;
       if (window.axisProjection && window.csvData) {
-        const projections = window.axisProjection.getProjections(currentDate, startDay, endDay, window.csvData, axisOverlay.getCurrentAxes(), cw, ch);
-        projections.forEach(p => {
-          const date = p.date instanceof Date ? p.date : null;
-          if (!date) return;  
-          
-          const timelineX = dayScale(date.getDate());
+        const projections = window.axisProjection.getProjections(currentDate, startDate, endDate, window.csvData, axisOverlay.getCurrentAxes(), cw, ch);
+          projections.forEach(p => {
+            const date = p.date instanceof Date ? p.date : null;
+            if (!date) return;
+
+            const timelineX = dateInt.dateToX ? dateInt.dateToX(date) : dayScale(date.getDate());
           // connection color - same as axis but semi-transparent
           const connColor = [p.color[0], p.color[1], p.color[2], 0.7];
           renderer.addLineToBuffer(p.px, p.py, timelineX, centerY, connColor, 1);

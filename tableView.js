@@ -15,7 +15,7 @@
 
   async function initTableView() {
     try {
-      const parsed = await window.readCSV.loadCSVFromUrl('res/climate_small.csv', ';');
+      const parsed = await window.readCSV.loadCSVFromUrl('res/climate_small_extended.csv', ';');
       window.csvData = parsed;
 
       // Extract first date from CSV and set currentDate via dateInteraction module
@@ -24,23 +24,25 @@
         if (firstRowDate instanceof Date) {
           // Use dateInteraction API to update date state
           window.dateInteraction.setCurrentDate(firstRowDate);
-          window.dateInteraction.setStartDay(firstRowDate.getDate());
-          window.dateInteraction.setEndDay(firstRowDate.getDate());
+            window.dateInteraction.setStartDay(firstRowDate.getDate());
+            window.dateInteraction.setEndDay(firstRowDate.getDate());
 
-          // Update dayScale for the new month
-          const daysInMonth = window.dateInteraction.getDaysInMonth();
-          const dayScale = d3.scaleLinear()
-            .domain([1, daysInMonth])
-            .range([window.dateInteraction.getTimelineStart(), window.dateInteraction.getTimelineEnd()]);
-          window.dateInteraction.setDayScale(dayScale);
-          window.dateInteraction.updateDateDisplay();
+            // Update scale domain for the current mode
+            const ticks = window.dateInteraction.getTickCount ? window.dateInteraction.getTickCount() : window.dateInteraction.getDaysInMonth();
+            const dayScale = d3.scaleLinear()
+              .domain([1, ticks])
+              .range([window.dateInteraction.getTimelineStart(), window.dateInteraction.getTimelineEnd()]);
+            window.dateInteraction.setDayScale(dayScale);
+            window.dateInteraction.updateDateDisplay();
         }
       }
 
       // compute ranges for axes and update projections
       if (window.axisProjection) {
         window.axisProjection.computeRanges(window.csvData, window.axisOverlay.getCurrentAxes());
-        window.axisProjection.getProjections(window.dateInteraction.getCurrentDate(), window.dateInteraction.getStartDay(), window.dateInteraction.getEndDay(), window.csvData);
+        if (window.axisProjection.getProjections) {
+          window.axisProjection.getProjections(window.dateInteraction.getCurrentDate(), window.dateInteraction.getStartDate(), window.dateInteraction.getEndDate(), window.csvData);
+        }
       }
       updateTableByDate();
     } catch (error) {
@@ -55,33 +57,13 @@
     if (!window.csvData) return;
 
     // Get date state from dateInteraction module
-    const startDay = window.dateInteraction.getStartDay();
-    const endDay = window.dateInteraction.getEndDay();
-    const currentDate = window.dateInteraction.getCurrentDate();
-
-    // Support date ranges: if startDay !== endDay, filter for all days in range
-    const rangeStart = Math.min(startDay, endDay);
-    const rangeEnd = Math.max(startDay, endDay);
+    const startDate = window.dateInteraction.getStartDate();
+    const endDate = window.dateInteraction.getEndDate();
 
     window.filteredRows = window.csvData.rows.filter(row => {
       if (!row.Date || !(row.Date instanceof Date)) return false;
-      const rowDateKey = formatDateAsKey(row.Date);
-
-      // Build date range to check against
-      const rowDate = new Date(row.Date);
-      const rowMonth = rowDate.getMonth();
-      const currentMonth = currentDate.getMonth();
-      const rowYear = rowDate.getFullYear();
-      const currentYear = currentDate.getFullYear();
-
-      // Check if row is in the same month/year as currentDate
-      if (rowYear !== currentYear || rowMonth !== currentMonth) {
-        return false;
-      }
-
-      // Check if row day is within the selected range
-      const rowDay = rowDate.getDate();
-      return rowDay >= rangeStart && rowDay <= rangeEnd;
+      const d = row.Date;
+      return d.getTime() >= startDate.getTime() && d.getTime() <= endDate.getTime();
     });
 
     renderTable();

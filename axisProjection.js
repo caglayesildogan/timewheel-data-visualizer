@@ -75,27 +75,25 @@
   // axes: array of axis descriptors (only static+enabled will be used)
   // containerWidth/Height: pixel size of the wheel container
   // returns array of { x1,y1,x2,y2, color }
-  function getProjections(currentDate, startDay, endDay, csvData, axes, containerWidth = 600, containerHeight = 600) {
+  // now accepts startDate and endDate as Date objects for flexible ranges
+  function getProjections(currentDate, startDate, endDate, csvData, axes, containerWidth = 600, containerHeight = 600) {
     const out = [];
     if (!csvData || !axes) return out;
 
     let rows = [];
     let row = null;
-
-    if (startDay !== endDay) {
-      // Zeitraum
-      const startDate = new Date(currentDate);
-      const endDate = new Date(currentDate);
-      startDate.setDate(startDay);
-      endDate.setDate(endDay);
-
+    // If startDate/endDate are provided as Dates, use them. Otherwise treat as single day using currentDate
+    if (startDate instanceof Date && endDate instanceof Date && startDate.getTime() !== endDate.getTime()) {
       rows = findAll(csvData, startDate, endDate);
       if (!rows || rows.length === 0) return out;
-
+    } else if (startDate instanceof Date && endDate instanceof Date) {
+      // single selected date
+      const sel = new Date(startDate);
+      row = findOne(csvData, sel);
+      if (!row) return out;
     } else {
-      // Einzelnes Datum
+      // Fallback: single currentDate day
       const selDate = new Date(currentDate);
-      selDate.setDate(startDay);
       row = findOne(csvData, selDate);
       if (!row) return out;
     }
@@ -116,14 +114,36 @@
     
       const { min, max } = ranges[key];
     
-      // welcher Fall?
-      const valueList = (startDay !== endDay)
-          ? rows.map(r => safeNumber(r[key])).filter(v => v !== null)
-          : [ safeNumber(row[key]) ];
-    
-      if (valueList.length === 0) return;
-    
-      // Geometrie der Achse
+        // welcher Fall? wenn `rows` mehrere Einträge enthält, betrachten wir die Reihe, sonst Einzel-Datum
+        // Für den 'years'-Modus aggregieren wir per Monat (Durchschnitt pro Monat).
+        let rowList = [];
+        if (rows && rows.length > 0) {
+          const mode = (window.dateInteraction && window.dateInteraction.getMode) ? window.dateInteraction.getMode() : 'days';
+          if (mode === 'years') {
+            // In years-mode: include every day's value for the selected months (no aggregation)
+            rows.forEach(r => {
+              if (!r || !(r.Date instanceof Date)) return;
+              const v = safeNumber(r[key]);
+              if (v === null) return;
+              rowList.push({ date: r.Date, value: v });
+            });
+            // sort by date
+            rowList.sort((a,b) => a.date - b.date);
+          } else {
+            // default: keep daily rows
+            rows.forEach(r => {
+              const v = safeNumber(r[key]);
+              if (v === null) return;
+              rowList.push({ date: r.Date, value: v });
+            });
+          }
+        } else if (row) {
+          rowList = [{ date: row.Date, value: safeNumber(row[key]) }];
+        }
+
+        if (rowList.length === 0) return;
+
+        // Geometrie der Achse
       const rotationDeg = window.axisOverlay ? window.axisOverlay.getRotationDeg() : 0;
       const rotationRad = rotationDeg * Math.PI / 180;
       const radialAngle = -Math.PI / 2 + rotationRad + (index / total) * (2 * Math.PI);
@@ -134,11 +154,11 @@
     
       const color = hexToRgba(ax.color || '#ffffff', 1.0);
     
-      // Für jeden Wert eine Projektion erzeugen
-      valueList.forEach((value, idx) => {
-        // In range-case benutzen wir rows[idx], bei Einzel-Datum benutzen wir die variable `row`
-        const r = (startDay !== endDay) ? rows[idx] : row;
-        if (!r || !(r.Date instanceof Date)) return;
+      // Für jeden Wert (oder Monats-Aggregat) eine Projektion erzeugen
+      rowList.forEach((item, idx) => {
+        const value = item.value;
+        const rDate = item.date;
+        if (!(rDate instanceof Date)) return;
 
         const t = (min === max) ? 0.5 : (value - min) / (max - min);
         const clamped = Math.min(Math.max(t, 0), 1);
@@ -151,7 +171,7 @@
 
         out.push({
           px, py, color, key,
-          date: r.Date   // ← Datum mitgeben
+          date: rDate   // ← Datum mitgeben
         });
       });
     });

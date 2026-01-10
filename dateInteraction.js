@@ -3,10 +3,16 @@
 
   // State - will be accessed from main.js
   let currentDate = new Date();
+  // `startDay` / `endDay` are used as generic tick indices depending on mode:
+  // - days: 1..daysInMonth -> day of month
+  // - months: 1..12 -> month index
+  // - years: 1..(12*yearCount) -> month index across multiple years
   let startDay = 1;
   let endDay = 1;
   let dragMode = null; // 'move', 'left', 'right'
   let isDragging = false;
+  let mode = 'days'; // 'days' | 'months' | 'years'
+  let yearCount = 1; // used when mode === 'years'
 
   const canvas = document.getElementById('glCanvas');
   const prevMonthButton = document.getElementById('prevMonth');
@@ -36,14 +42,82 @@
     ).getDate();
   }
 
+  function getTickCount() {
+    if (mode === 'days') return getDaysInMonth();
+    if (mode === 'months') return 12;
+    if (mode === 'years') return 12 * Math.max(1, yearCount);
+    return getDaysInMonth();
+  }
+
+  function setMode(m) {
+    if (!['days','months','years'].includes(m)) return;
+    mode = m;
+    // reset selection to safe defaults
+    startDay = 1; endDay = 1;
+    // update scale domain
+    dayScale.domain([1, getTickCount()]);
+    updateDateDisplay();
+  }
+
+  function getMode() { return mode; }
+
+  function setYearCount(n) {
+    yearCount = Math.max(1, Math.min(5, Math.floor(Number(n) || 1)));
+    // when changing year count adjust domain
+    dayScale.domain([1, getTickCount()]);
+    startDay = Math.min(startDay, getTickCount());
+    endDay = Math.min(endDay, getTickCount());
+    updateDateDisplay();
+  }
+
+  function getYearCount() { return yearCount; }
+
+  // Convert a JavaScript Date -> timeline X position depending on current mode
+  function dateToX(date) {
+    if (!(date instanceof Date)) return null;
+    if (mode === 'days') {
+      return dayScale(date.getDate());
+    }
+    // base month for months/years mapping is currentDate's month/year
+    const baseYear = currentDate.getFullYear();
+    const baseMonth = currentDate.getMonth();
+    const offset = (date.getFullYear() - baseYear) * 12 + (date.getMonth() - baseMonth) + 1; // 1-based
+    return dayScale(offset);
+  }
+
+  function getStartDate() {
+    if (mode === 'days') {
+      const sd = new Date(currentDate);
+      sd.setDate(startDay);
+      return sd;
+    }
+    // months/years -> compute month offset
+    const base = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+    const sd = new Date(base);
+    sd.setMonth(base.getMonth() + (startDay - 1));
+    sd.setDate(1);
+    return sd;
+  }
+
+  function getEndDate() {
+    if (mode === 'days') {
+      const ed = new Date(currentDate);
+      ed.setDate(endDay);
+      return ed;
+    }
+    // months/years -> compute month offset and set to last day of that month
+    const base = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+    const ed = new Date(base);
+    ed.setMonth(base.getMonth() + (endDay - 1) + 1); // go to next month
+    ed.setDate(0); // last day of previous month
+    return ed;
+  }
+
   function updateMonth(delta) {
     currentDate.setMonth(currentDate.getMonth() + delta);
-    startDay = 1;
-    endDay = 1;
-    const daysInMonth = getDaysInMonth();
-    
-    // Update dayScale domain
-    dayScale.domain([1, daysInMonth]);
+    startDay = 1; endDay = 1;
+    // Update dayScale domain depending on mode
+    dayScale.domain([1, getTickCount()]);
     
     // Update the date display
     updateDateDisplay();
@@ -55,30 +129,33 @@
   function updateDateDisplay() {
     console.log('updateDateDisplay:', { startDay, endDay, currentDate });
     
-    const startDate = new Date(currentDate);
-    startDate.setDate(startDay);
-    const endDate = new Date(currentDate);
-    endDate.setDate(endDay);
-    
-    if (startDay === endDay) {
-      // Single day
-      dateDisplay.textContent = startDate.toLocaleDateString('de-DE', { 
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric'
-      });
-    } else {
-      // Date range
-      const startStr = startDate.toLocaleDateString('de-DE', { 
-        day: 'numeric',
-        month: 'long'
-      });
-      const endStr = endDate.toLocaleDateString('de-DE', { 
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric'
-      });
-      dateDisplay.textContent = `${startStr} - ${endStr}`;
+    const startDate = getStartDate();
+    const endDate = getEndDate();
+
+    if (mode === 'days') {
+      if (startDay === endDay) {
+        dateDisplay.textContent = startDate.toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' });
+      } else {
+        const startStr = startDate.toLocaleDateString('de-DE', { day: 'numeric', month: 'long' });
+        const endStr = endDate.toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' });
+        dateDisplay.textContent = `${startStr} - ${endStr}`;
+      }
+    } else if (mode === 'months') {
+      if (startDay === endDay) {
+        dateDisplay.textContent = startDate.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' });
+      } else {
+        const startStr = startDate.toLocaleDateString('de-DE', { month: 'long' });
+        const endStr = endDate.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' });
+        dateDisplay.textContent = `${startStr} - ${endStr}`;
+      }
+    } else if (mode === 'years') {
+      if (startDay === endDay) {
+        dateDisplay.textContent = startDate.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' });
+      } else {
+        const startStr = startDate.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' });
+        const endStr = endDate.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' });
+        dateDisplay.textContent = `${startStr} - ${endStr}`;
+      }
     }
     
     // Update the table view
@@ -86,7 +163,7 @@
     
     // Update projections for the (new) selected date
     if (window.axisProjection) {
-      window.axisProjection.getProjections(currentDate, startDay, endDay, window.csvData);
+      window.axisProjection.getProjections(currentDate, getStartDate(), getEndDate(), window.csvData);
     }
   }
 
@@ -136,7 +213,7 @@
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const newDay = Math.round(dayScale.invert(x));
-    const daysInMonth = getDaysInMonth();
+    const ticks = getTickCount();
     
     console.log('Dragging:', { dragMode, newDay, startDay, endDay });
 
@@ -153,7 +230,7 @@
         
       case 'right':
         // Allow the right edge to be moved down to (and including) startDay
-        const newEndDay = Math.max(Math.min(daysInMonth, newDay), startDay);
+        const newEndDay = Math.max(Math.min(ticks, newDay), startDay);
         if (newEndDay !== endDay) {
           endDay = newEndDay;
           if (startDay > endDay) startDay = endDay;
@@ -164,10 +241,10 @@
       case 'move':
         const width = endDay - startDay;
         let newStart = Math.round(newDay - width / 2);
-        
-        // Limit within month bounds
+
+        // Limit within ticks bounds
         if (newStart < 1) newStart = 1;
-        if (newStart + width > daysInMonth) newStart = daysInMonth - width;
+        if (newStart + width > ticks) newStart = ticks - width;
         
         if (newStart !== startDay) {
           startDay = newStart;
@@ -248,6 +325,15 @@
     getDayScale: () => dayScale,
     setDayScale: (scale) => { dayScale = scale; },
     getDaysInMonth,
+    // new APIs for mode-aware behavior
+    getTickCount,
+    setMode,
+    getMode,
+    setYearCount,
+    getYearCount,
+    dateToX,
+    getStartDate,
+    getEndDate,
     getTimelineStart: () => timelineStart,
     getTimelineEnd: () => timelineEnd,
     getCenterY: () => centerY,

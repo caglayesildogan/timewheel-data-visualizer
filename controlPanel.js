@@ -222,6 +222,81 @@
       }
     })();
 
+    // Time mode selector (Tage / Monate / Jahre) + year count control
+    (function createTimeModeControl(){
+      const modeContainer = document.createElement('div');
+      modeContainer.className = 'control-row time-mode-container';
+
+      const lbl = document.createElement('label');
+      lbl.htmlFor = 'timeModeSelect';
+      lbl.className = 'time-mode-label';
+      lbl.textContent = 'Time Mode:';
+
+      const select = document.createElement('select');
+      select.id = 'timeModeSelect';
+      const optDays = document.createElement('option'); optDays.value = 'days'; optDays.textContent = 'Tage';
+      const optMonths = document.createElement('option'); optMonths.value = 'months'; optMonths.textContent = 'Monate';
+      const optYears = document.createElement('option'); optYears.value = 'years'; optYears.textContent = 'Jahre';
+      select.appendChild(optDays); select.appendChild(optMonths); select.appendChild(optYears);
+
+      const yearLabel = document.createElement('label');
+      yearLabel.htmlFor = 'yearCount';
+      yearLabel.className = 'year-count-label';
+      yearLabel.textContent = 'Anzahl Jahre:';
+      yearLabel.style.marginLeft = '8px';
+
+      const yearInput = document.createElement('input');
+      yearInput.type = 'number';
+      yearInput.id = 'yearCount';
+      yearInput.min = 1; yearInput.max = 5; yearInput.value = 1;
+      yearInput.style.width = '54px';
+
+      // Hide year input unless 'years' selected
+      function updateYearInputVisibility() {
+        if (select.value === 'years') {
+          yearLabel.style.display = 'inline-block';
+          yearInput.style.display = 'inline-block';
+        } else {
+          yearLabel.style.display = 'none';
+          yearInput.style.display = 'none';
+        }
+      }
+
+      // Event handlers: update global dateInteraction if available
+      select.addEventListener('change', (e) => {
+        const v = e.target.value;
+        if (window.dateInteraction && window.dateInteraction.setMode) window.dateInteraction.setMode(v);
+        updateYearInputVisibility();
+        notify();
+      });
+      yearInput.addEventListener('change', (e)=>{
+        const n = Math.max(1, Math.min(5, Number(e.target.value)||1));
+        yearInput.value = n;
+        if (window.dateInteraction && window.dateInteraction.setYearCount) window.dateInteraction.setYearCount(n);
+        notify();
+      });
+
+      modeContainer.appendChild(lbl);
+      modeContainer.appendChild(select);
+      modeContainer.appendChild(yearLabel);
+      modeContainer.appendChild(yearInput);
+
+      try {
+        const magn = document.getElementById('magnificationSlider');
+        if (magn && magn.parentElement) magn.parentElement.insertAdjacentElement('afterend', modeContainer);
+        else arrangementEl.insertAdjacentElement('afterend', modeContainer);
+      } catch (err) {
+        document.body.appendChild(modeContainer);
+      }
+
+      // Initialize visibility and sync with existing dateInteraction state if present
+      if (window.dateInteraction) {
+        if (window.dateInteraction.getMode) select.value = window.dateInteraction.getMode();
+        if (window.dateInteraction.getYearCount) yearInput.value = window.dateInteraction.getYearCount();
+      }
+      updateYearInputVisibility();
+    })();
+
     // Reset magnification slider
     const mag = document.getElementById('magnificationSlider');
     const magVal = document.getElementById('magnificationValue');
