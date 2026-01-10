@@ -37,7 +37,6 @@
   }
 
   // helper to find the CSV row that matches a JS Date (year, month, day)
-  /// FIXME: needs to be advanced to handle date ranges
   function findOne(csvData, date) {
     if (!csvData || !Array.isArray(csvData.rows)) return null;
     for (let i = 0; i < csvData.rows.length; i++) {
@@ -72,10 +71,6 @@
 
 
   // produce projection line geometry for the currently selected date
-  // axes: array of axis descriptors (only static+enabled will be used)
-  // containerWidth/Height: pixel size of the wheel container
-  // returns array of { x1,y1,x2,y2, color }
-  // now accepts startDate and endDate as Date objects for flexible ranges
   function getProjections(currentDate, startDate, endDate, csvData, axes, containerWidth = 600, containerHeight = 600) {
     const out = [];
     if (!csvData || !axes) return out;
@@ -114,8 +109,6 @@
     
       const { min, max } = ranges[key];
     
-        // welcher Fall? wenn `rows` mehrere Einträge enthält, betrachten wir die Reihe, sonst Einzel-Datum
-        // Für den 'years'-Modus aggregieren wir per Monat (Durchschnitt pro Monat).
         let rowList = [];
         if (rows && rows.length > 0) {
           const mode = (window.dateInteraction && window.dateInteraction.getMode) ? window.dateInteraction.getMode() : 'days';
@@ -154,7 +147,6 @@
     
       const color = hexToRgba(ax.color || '#ffffff', 1.0);
     
-      // Für jeden Wert (oder Monats-Aggregat) eine Projektion erzeugen
       rowList.forEach((item, idx) => {
         const value = item.value;
         const rDate = item.date;
@@ -171,7 +163,7 @@
 
         out.push({
           px, py, color, key,
-          date: rDate   // ← Datum mitgeben
+          date: rDate
         });
       });
     });

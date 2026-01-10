@@ -29,7 +29,6 @@
   window.__controlsState = __controlsState;
 
   // The control panel calls this whenever the user changes something.
-  // We just replace our local state.
   window.onControlsChange = (st) => {
     __controlsState = JSON.parse(JSON.stringify(st));
     window.__controlsState = __controlsState;  // Keep window version in sync
@@ -37,7 +36,6 @@
     window.axisOverlay && window.axisOverlay.updateAxisHTML && window.axisOverlay.updateAxisHTML();
   };
 
-  // Handy for debugging in DevTools:
   window.getControlsState = () => JSON.parse(JSON.stringify(__controlsState));
 
   function initControlsUI() {
