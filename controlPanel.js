@@ -39,6 +39,12 @@
   window.getControlsState = () => JSON.parse(JSON.stringify(__controlsState));
 
   function initControlsUI() {
+
+    function updateAxisHTML() {
+      if (window.axisOverlay && window.axisOverlay.updateAxisHTML) {
+        window.axisOverlay.updateAxisHTML();
+      }
+    }
     // Grab all interactive elements from index.html.
     const $ = s => document.querySelector(s);
     const axisListEl   = $('#axisList');
@@ -93,14 +99,12 @@
             // MIN: If already 5 static axes enabled, block disabling the 5th
             if (!willEnable && enabledStaticCount <= MIN_STATIC_AXES) {
               e.target.checked = true; // revert checkbox
-              alert(`Minimum ${MIN_STATIC_AXES} attributes must be selected.`);
               return;
             }
 
             // MAX: If already 8 static axes enabled, block enabling the 9th
             if (willEnable && enabledStaticCount >= MAX_STATIC_AXES) {
               e.target.checked = false; // revert checkbox
-              alert(`Maximum ${MAX_STATIC_AXES} attributes can be selected.`);
               return;
             }
           }
@@ -160,11 +164,14 @@
     });
     btnReset.addEventListener('click', () => {
       __controlsState = {
-        arrangement: 'coordinatesWheel',
-        linking: 'none',
-        axes: JSON.parse(JSON.stringify(DEFAULT_AXES)),
-        selectedIndex: 0                   
-      };
+      arrangement: 'coordinatesWheel',
+      linking: 'none',
+      axes: JSON.parse(JSON.stringify(DEFAULT_AXES)),
+      selectedIndex: 0,
+      rotation: 0,
+      magnification: 0
+    };
+
       // Reset rotation slider
       const rot = document.getElementById('rotationSlider');  
       const rotVal = document.getElementById('rotationValue');

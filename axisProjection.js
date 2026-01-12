@@ -69,6 +69,87 @@
     return out;
   }
 
+  // Clamp a value to the range [0, 1]
+  function clamp01(v) {
+    return Math.max(0, Math.min(1, v));
+  }
+
+  // Compute the intersection point of two infinite lines
+  function intersectLines(n1, r1, n2, r2) {
+    const det = n1.x * n2.y - n1.y * n2.x;
+    if (Math.abs(det) < 1e-6) return null;
+    const x = (r1 * n2.y - n1.y * r2) / det;
+    const y = (n1.x * r2 - r1 * n2.x) / det;
+    return { x, y };
+  }
+
+  // Compute all axis geometries including rotation and magnification effects
+  function computeAxisGeometries(total, baseRadius, rotationDeg, magnification) {
+    const m = clamp01(magnification / 100);
+    const rotationRad = rotationDeg * Math.PI / 180;
+    const geoms = [];
+    const normals = [];
+    const radii = [];
+
+    for (let i = 0; i < total; i++) {
+      const radialAngle = -Math.PI / 2 + rotationRad + (i / total) * (2 * Math.PI);
+      const tangentAngle = radialAngle + Math.PI / 2;
+      const w = Math.abs(Math.sin(radialAngle)); // 1 at top/bottom, 0 at left/right
+      // Shape target:
+      const radiusScale = 1 + m * (0.18 * (1 - w) - 0.22 * w);
+      const radius = baseRadius * radiusScale;
+
+      const nx = Math.cos(radialAngle);
+      const ny = Math.sin(radialAngle);
+      const tx = -Math.sin(radialAngle);
+      const ty = Math.cos(radialAngle);
+
+      normals.push({ x: nx, y: ny });
+      radii.push(radius);
+      geoms.push({
+        radialAngle,
+        tangentAngle,
+        radius,
+        nx,
+        ny,
+        tx,
+        ty
+      });
+    }
+
+    // Compute final axis length and center offset based on neighboring axis intersections
+    const baseAxisLength = 2 * baseRadius * Math.tan(Math.PI / total) + 2;
+    for (let i = 0; i < total; i++) {
+      const prev = (i - 1 + total) % total;
+      const next = (i + 1) % total;
+      const n = normals[i];
+      const center = { x: n.x * radii[i], y: n.y * radii[i] };
+      const prevPt = intersectLines(n, radii[i], normals[prev], radii[prev]);
+      const nextPt = intersectLines(n, radii[i], normals[next], radii[next]);
+
+      // If intersection fails, use default axis length
+      if (!prevPt || !nextPt) {
+        geoms[i].axisLength = baseAxisLength;
+        geoms[i].midOffset = 0;
+        geoms[i].center = center;
+        continue;
+      }
+
+      // Project intersection points onto the tangent to find extents
+      const sPrev = (prevPt.x - center.x) * geoms[i].tx + (prevPt.y - center.y) * geoms[i].ty;
+      const sNext = (nextPt.x - center.x) * geoms[i].tx + (nextPt.y - center.y) * geoms[i].ty;
+      const sMin = Math.min(sPrev, sNext);
+      const sMax = Math.max(sPrev, sNext);
+      const axisLength = Math.max(10, sMax - sMin);
+
+      geoms[i].axisLength = axisLength;
+      geoms[i].midOffset = (sMin + sMax) / 2;
+      geoms[i].center = center;
+    }
+
+    return geoms;
+  }
+
 
   // produce projection line geometry for the currently selected date
   function getProjections(currentDate, startDate, endDate, csvData, axes, containerWidth = 600, containerHeight = 600) {
@@ -100,8 +181,14 @@
 
     const centerX = containerWidth / 2;
     const centerY = containerHeight / 2;
-    const radius = containerWidth * 0.38;
-    const axisLength = containerWidth * 0.35;
+    const baseRadius = containerWidth * 0.38;
+    let mag = 0;  // Use dynamic axis geometry to support rotation and magnification instead of a fixed axis length
+    try {
+      const st = (window.getControlsState && window.getControlsState()) || window.__controlsState;
+      if (st && typeof st.magnification === 'number') mag = st.magnification;
+    } catch(e){}
+    const rotationDeg = window.axisOverlay ? window.axisOverlay.getRotationDeg() : 0;
+    const geoms = computeAxisGeometries(total, baseRadius, rotationDeg, mag);
 
     activeAxes.forEach((ax, index) => {
       const key = ax.key;
@@ -136,14 +223,11 @@
 
         if (rowList.length === 0) return;
 
-        // Geometrie der Achse
-      const rotationDeg = window.axisOverlay ? window.axisOverlay.getRotationDeg() : 0;
-      const rotationRad = rotationDeg * Math.PI / 180;
-      const radialAngle = -Math.PI / 2 + rotationRad + (index / total) * (2 * Math.PI);
-      const tangentAngle = radialAngle + Math.PI / 2;
-    
-      const cx = centerX + Math.cos(radialAngle) * radius;
-      const cy = centerY + Math.sin(radialAngle) * radius;
+      // Use precomputed axis geometry so center position and length correctly reflect rotation and magnification
+      const geom = geoms[index];
+      const axisLength = geom.axisLength;
+      const cx = centerX + geom.center.x + geom.tx * geom.midOffset;
+      const cy = centerY + geom.center.y + geom.ty * geom.midOffset;
     
       const color = hexToRgba(ax.color || '#ffffff', 1.0);
     
@@ -158,8 +242,8 @@
         const localX = -axisLength / 2 + clamped * axisLength;
         const localY = -6;
 
-        const px = cx + localX * Math.cos(tangentAngle) - localY * Math.sin(tangentAngle);
-        const py = cy + localX * Math.sin(tangentAngle) + localY * Math.cos(tangentAngle);
+        const px = cx + localX * Math.cos(geom.tangentAngle) - localY * Math.sin(geom.tangentAngle);
+        const py = cy + localX * Math.sin(geom.tangentAngle) + localY * Math.cos(geom.tangentAngle);
 
         out.push({
           px, py, color, key,
