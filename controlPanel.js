@@ -28,6 +28,72 @@
   // Expose __controlsState to window for use in other modules
   window.__controlsState = __controlsState;
 
+  // Color palette used for automatic axis color assignment
+  const AXIS_COLORS = [
+    '#ef4444', '#f59e0b', '#3b82f6', '#22c55e',
+    '#a855f7', '#14b8a6', '#eab308', '#f97316'
+  ];
+
+  let __renderAxisList = null;
+  let __axisTypeEl = null;
+
+  // Detect the Date column in a CSV dataset using column names, types, or parsed values
+  function findDateKeyFromCSV(csvData) {
+    if (!csvData || !Array.isArray(csvData.columns)) return null;
+    const columns = csvData.columns;
+    const types = Array.isArray(csvData.types) ? csvData.types : [];
+    const lowerIndex = columns.findIndex(c => String(c).toLowerCase() === 'date');
+    if (lowerIndex >= 0) return columns[lowerIndex];
+
+    const typeIndex = types.findIndex(t => String(t).toLowerCase() === 'date');
+    if (typeIndex >= 0) return columns[typeIndex];
+
+    const firstRow = csvData.rows && csvData.rows[0];
+    if (firstRow) {
+      for (let i = 0; i < columns.length; i++) {
+        if (firstRow[columns[i]] instanceof Date) return columns[i];
+      }
+    }
+    return null;
+  }
+
+  // Build a default axis configuration from a CSV dataset (detect Date + select numeric columns)
+  function buildAxesFromCSV(csvData) {
+    const columns = Array.isArray(csvData.columns) ? csvData.columns : [];
+    const dateKey = findDateKeyFromCSV(csvData); // Add the detected Date column as the time (scroll) axis
+    const axes = [];
+    if (dateKey) {
+      axes.push({ key: dateKey, type: 'scroll', color: '#9ca3af', enabled: true, isTime: true });
+    }
+
+    const rows = Array.isArray(csvData.rows) ? csvData.rows : [];
+    const numericColumns = columns.filter(c => {
+      if (c === dateKey) return false;
+      let count = 0;
+      for (let i = 0; i < rows.length; i++) {
+        if (typeof rows[i][c] === 'number') {
+          count++;
+          if (count >= 3) return true;
+        }
+      }
+      return false;
+    });
+    const staticColumns = numericColumns;
+    let enabledCount = Math.min(8, staticColumns.length);
+    if (enabledCount < 5) enabledCount = staticColumns.length;
+
+    staticColumns.forEach((col, i) => {
+      axes.push({
+        key: col,
+        type: 'static',
+        color: AXIS_COLORS[i % AXIS_COLORS.length],
+        enabled: i < enabledCount
+      });
+    });
+
+    return { axes, dateKey };
+  }
+
   // The control panel calls this whenever the user changes something.
   window.onControlsChange = (st) => {
     __controlsState = JSON.parse(JSON.stringify(st));
@@ -56,6 +122,8 @@
     const btnRemove    = $('#btnRemove');
     const btnAddAll    = $('#btnAddAll');
     const btnReset     = $('#btnReset');
+
+    __axisTypeEl = axisTypeEl;
 
     function notify() { window.onControlsChange(__controlsState); }
 
@@ -125,6 +193,7 @@
         axisListEl.appendChild(li);
       });
     }
+    __renderAxisList = renderAxisList;
 
     // Initial values
     arrangementEl.value = __controlsState.arrangement;
@@ -362,7 +431,23 @@
 
   window.controls = {
     initControlsUI,
-    DEFAULT_AXES
+    DEFAULT_AXES, 
+    autoConfigureAxes: (csvData) => { // Automatically build and apply axis configuration based on the loaded dataset
+      if (!csvData) return;
+      const built = buildAxesFromCSV(csvData);
+      if (!built.axes.length) return;
+
+      __controlsState.axes = built.axes;
+      __controlsState.selectedIndex = 0;
+      window.__controlsState = __controlsState;
+      if (built.dateKey) window.__dateColumnKey = built.dateKey;
+
+      if (__axisTypeEl) {
+        __axisTypeEl.value = __controlsState.axes[0].type;
+      }
+      if (__renderAxisList) __renderAxisList();
+      if (window.onControlsChange) window.onControlsChange(__controlsState);
+    }
   };
 
 })();

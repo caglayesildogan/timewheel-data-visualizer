@@ -6,6 +6,10 @@
   // internal ranges: { key: { min, max } }
   let ranges = {};
 
+  function getDateKey() {
+    return window.__dateColumnKey || 'Date';
+  }
+
   function safeNumber(v) {
     if (v === null || v === undefined) return null;
     if (typeof v === 'number') return v;
@@ -39,9 +43,10 @@
   // helper to find the CSV row that matches a JS Date (year, month, day)
   function findOne(csvData, date) {
     if (!csvData || !Array.isArray(csvData.rows)) return null;
+    const dateKey = getDateKey();
     for (let i = 0; i < csvData.rows.length; i++) {
       const r = csvData.rows[i];
-      const d = r.Date;
+      const d = r[dateKey];
       if (!(d instanceof Date)) continue;
       if (d.getFullYear() === date.getFullYear() && d.getMonth() === date.getMonth() && d.getDate() === date.getDate()) return r;
     }
@@ -54,10 +59,11 @@
 
     const start = startDate.getTime();
     const end = endDate.getTime();
+    const dateKey = getDateKey();
 
     for (let i = 0; i < csvData.rows.length; i++) {
       const r = csvData.rows[i];
-      const d = r.Date;
+      const d = r[dateKey];
 
       if (!(d instanceof Date)) continue;
 
@@ -202,10 +208,11 @@
           if (mode === 'years') {
             // In years-mode: include every day's value for the selected months (no aggregation)
             rows.forEach(r => {
-              if (!r || !(r.Date instanceof Date)) return;
+              const d = r[getDateKey()];
+              if (!d || !(d instanceof Date)) return;
               const v = safeNumber(r[key]);
               if (v === null) return;
-              rowList.push({ date: r.Date, value: v });
+              rowList.push({ date: d, value: v });
             });
             // sort by date
             rowList.sort((a,b) => a.date - b.date);
@@ -214,11 +221,11 @@
             rows.forEach(r => {
               const v = safeNumber(r[key]);
               if (v === null) return;
-              rowList.push({ date: r.Date, value: v });
+              rowList.push({ date: r[getDateKey()], value: v });
             });
           }
         } else if (row) {
-          rowList = [{ date: row.Date, value: safeNumber(row[key]) }];
+          rowList = [{ date: row[getDateKey()], value: safeNumber(row[key]) }];
         }
 
         if (rowList.length === 0) return;

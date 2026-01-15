@@ -61,6 +61,11 @@
 			case 'string':
 				return v;
 			default:
+					// If no explicit type: try date patterns first, then numeric, then date, else string
+				if (/^\d{4}-\d{2}-\d{2}/.test(v) || /^\d{1,2}\/\d{1,2}\/\d{4}/.test(v)) {
+					const d0 = new Date(v);
+					if (!isNaN(d0.getTime())) return d0;
+				}
 				// If no explicit type: try numeric, else date, else string
 				const n = parseFloat(v.replace(/,/g, '.'));
 				if (Number.isFinite(n)) return n;
