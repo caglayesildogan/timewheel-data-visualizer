@@ -35,6 +35,8 @@
     { label: 'Climate (extended)', url: 'res/climate_small_extended.csv', delimiter: ';' },
     { label: 'Adani Ports Stock', url: 'res/ADANIPORTS.csv', delimiter: ',' },
     { label: 'Artificial', url: 'res/artificial.csv' },
+    { label: 'S&P 500 Stocks', url: 'res/all_stocks_5yr.csv', delimiter: ',' },
+    { label: 'Major Cryptocurrency Daily Price', url: 'res/BNB_USD_daily_data.csv', delimiter: ',' }
   ];
 
   // Populate the dataset dropdown and load the selected dataset on change
