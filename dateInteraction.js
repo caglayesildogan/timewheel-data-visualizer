@@ -11,6 +11,7 @@
   let endDay = 1;
   let dragMode = null; // 'move', 'left', 'right'
   let isDragging = false;
+  let isHoveringSlider = false; // track if mouse is over slider
   let mode = 'days'; // 'days' | 'months' | 'years'
   let yearCount = 1; // used when mode === 'years'
 
@@ -272,6 +273,7 @@
       handleDrag(e);
     } else {
       const edge = isOverSliderEdge(x, y);
+      isHoveringSlider = edge !== null;
       if (edge === 'left' || edge === 'right') {
         canvas.style.cursor = 'ew-resize';
       } else if (edge === 'move') {
@@ -340,7 +342,8 @@
     updateDateDisplay,
     isOverSliderEdge,
     getIsDragging: () => isDragging,
-    getDragMode: () => dragMode
+    getDragMode: () => dragMode,
+    getIsHoveringSlider: () => isHoveringSlider
   };
 
 })();

@@ -64,24 +64,30 @@
     const sliderHeight = 16;
     const halfSize = sliderHeight / 2;
     
+    // Check if slider is being interacted with
+    const isInteracting = dateInt.getIsDragging() || dateInt.getIsHoveringSlider();
+    const sliderFillColor = isInteracting ? [1, 1, 1, 1] : [1, 1, 1, 0]; // white when interacting, transparent otherwise
+    
     if (startX === endX) {
       // Single day - draw a small square slider
-      renderer.addLineToBuffer(startX , centerY, endX + sliderHeight, centerY, [1, 1, 1, 1], sliderHeight);
+      renderer.addLineToBuffer(startX , centerY, endX + sliderHeight, centerY, sliderFillColor, sliderHeight);
       
-      // White edges
-      renderer.addLineToBuffer(startX, centerY - sliderHeight/2, startX + sliderHeight, centerY + sliderHeight/2, [1, 1, 1, 1], 2);
-      renderer.addLineToBuffer(startX, centerY - sliderHeight/2, startX + sliderHeight, centerY + sliderHeight/2, [1, 1, 1, 1], 2);
-      renderer.addLineToBuffer(startX, centerY - sliderHeight/2, startX + sliderHeight, centerY - sliderHeight/2, [1, 1, 1, 1], 2);
-      renderer.addLineToBuffer(startX, centerY + sliderHeight/2, startX + sliderHeight, centerY + sliderHeight/2, [1, 1, 1, 1], 2);
+      // White edges - rectangle outline
+      const squareEnd = startX + sliderHeight;
+      renderer.addLineToBuffer(startX, centerY - sliderHeight/2, startX, centerY + sliderHeight/2, [1, 1, 1, 1], 2);
+      renderer.addLineToBuffer(squareEnd, centerY - sliderHeight/2, squareEnd, centerY + sliderHeight/2, [1, 1, 1, 1], 2);
+      renderer.addLineToBuffer(startX, centerY - sliderHeight/2, squareEnd, centerY - sliderHeight/2, [1, 1, 1, 1], 2);
+      renderer.addLineToBuffer(startX, centerY + sliderHeight/2, squareEnd, centerY + sliderHeight/2, [1, 1, 1, 1], 2);
     } else {
       // Date range - draw a rectangular slider
-      renderer.addLineToBuffer(startX, centerY, endX + halfSize, centerY, [1, 1, 1, 1], sliderHeight);
+      renderer.addLineToBuffer(startX, centerY, endX + halfSize, centerY, sliderFillColor, sliderHeight);
       
-      // White edges
-      renderer.addLineToBuffer(startX, centerY - sliderHeight/2, startX + halfSize, centerY + sliderHeight/2, [1, 1, 1, 1], 2);
-      renderer.addLineToBuffer(endX, centerY - sliderHeight/2, endX + halfSize, centerY + sliderHeight/2, [1, 1, 1, 1], 2);
-      renderer.addLineToBuffer(startX, centerY - sliderHeight/2, endX + halfSize, centerY - sliderHeight/2, [1, 1, 1, 1], 2);
-      renderer.addLineToBuffer(startX, centerY + sliderHeight/2, endX + halfSize, centerY + sliderHeight/2, [1, 1, 1, 1], 2);
+      // White edges - rectangle outline
+      const rectEnd = endX + halfSize;
+      renderer.addLineToBuffer(startX, centerY - sliderHeight/2, startX, centerY + sliderHeight/2, [1, 1, 1, 1], 2);
+      renderer.addLineToBuffer(rectEnd, centerY - sliderHeight/2, rectEnd, centerY + sliderHeight/2, [1, 1, 1, 1], 2);
+      renderer.addLineToBuffer(startX, centerY - sliderHeight/2, rectEnd, centerY - sliderHeight/2, [1, 1, 1, 1], 2);
+      renderer.addLineToBuffer(startX, centerY + sliderHeight/2, rectEnd, centerY + sliderHeight/2, [1, 1, 1, 1], 2);
     }
 
     // Draw axis projection lines
