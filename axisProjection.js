@@ -254,7 +254,9 @@
 
         out.push({
           px, py, color, key,
-          date: rDate
+          date: rDate,
+          itemIndex: idx,
+          totalItems: rowList.length
         });
       });
     });

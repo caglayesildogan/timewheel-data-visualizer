@@ -91,14 +91,29 @@
       const ch = container ? container.clientHeight || 600 : 600;
       if (window.axisProjection && window.csvData) {
         const projections = window.axisProjection.getProjections(currentDate, startDate, endDate, window.csvData, axisOverlay.getCurrentAxes(), cw, ch);
-          projections.forEach(p => {
-            const date = p.date instanceof Date ? p.date : null;
-            if (!date) return;
-
-            const timelineX = dateInt.dateToX ? dateInt.dateToX(date) : dayScale(date.getDate());
-          // connection color - same as axis but semi-transparent
-          const connColor = [p.color[0], p.color[1], p.color[2], 0.7];
-          renderer.addLineToBuffer(p.px, p.py, timelineX, centerY, connColor, 1);
+        
+        // Group projections by total count to normalize positions
+        const projectionsByCount = {};
+        projections.forEach(p => {
+          const countKey = p.totalItems || 1;
+          if (!projectionsByCount[countKey]) projectionsByCount[countKey] = [];
+          projectionsByCount[countKey].push(p);
+        });
+        
+        // Draw lines with normalized positions across the entire timeline
+        Object.values(projectionsByCount).forEach(group => {
+          const totalItems = group[0].totalItems;
+          group.forEach(p => {
+            const itemIndex = p.itemIndex || 0;
+            // Normalize index to [0, 1] range and map to timeline
+            const normalized = totalItems > 1 ? itemIndex / (totalItems - 1) : 0.5;
+            const timelineX = timelineStart + normalized * (timelineEnd - timelineStart);
+            
+            // connection color - same as axis but semi-transparent
+            const connColor = [p.color[0], p.color[1], p.color[2], 0.7];
+            // Draw line from data point to the timeline bottom (full height)
+            renderer.addLineToBuffer(p.px, p.py, timelineX, centerY, connColor, 1);
+          });
         });
       }
     } catch (e) {
