@@ -44,6 +44,20 @@
     return Math.max(0, Math.min(1, v));
   }
 
+  // Formats a range value for display on the axis
+  function formatRangeValue(v) {
+    if (!Number.isFinite(v)) return '';
+    const abs = Math.abs(v);
+    let maxDecimals = 2;
+    if (abs >= 1000) maxDecimals = 0;
+    else if (abs >= 100) maxDecimals = 1;
+    else if (abs < 1) maxDecimals = 3;
+    return v.toLocaleString('en-US', {
+      maximumFractionDigits: maxDecimals,
+      minimumFractionDigits: 0
+    });
+  }
+
   // Computes the intersection point of two infinite lines
   // Returns null if the lines are parallel
   function intersectLines(n1, r1, n2, r2) {
@@ -128,6 +142,9 @@
     const axisLength = geom.axisLength;
     const cx = centerX + geom.center.x + geom.tx * geom.midOffset;
     const cy = centerY + geom.center.y + geom.ty * geom.midOffset;
+    // Get range data from axisProjection module
+    const ranges = window.axisProjection && window.axisProjection._getRanges ? window.axisProjection._getRanges() : null; 
+    const range = ranges && ranges[ax.key] ? ranges[ax.key] : null;
 
     // DOM ELEMENT
     const el = document.createElement("div");
@@ -144,8 +161,21 @@
     el.style.transformOrigin = "50% 50%";
     el.style.transform = `rotate(${geom.tangentAngle * 180 / Math.PI}deg)`;
 
+    // Inner HTML
+    const minLabel = range ? formatRangeValue(range.min) : '';
+    const maxLabel = range ? formatRangeValue(range.max) : '';
+    const rangeHTML = range ? `
+      <div class="axis-range axis-range-min">
+        <span class="axis-value">${minLabel}</span>
+      </div>
+      <div class="axis-range axis-range-max">
+        <span class="axis-value">${maxLabel}</span>
+      </div>
+    ` : '';
+
     el.innerHTML = `
       <div class="axis-line"></div>
+      ${rangeHTML}                        
       <div class="axis-label">${ax.key}</div>
     `;
 
@@ -165,6 +195,11 @@
 
     const axes = getCurrentAxes();
     if (!axes.length) return;
+
+    // Compute ranges for all axes
+    if (window.axisProjection && window.axisProjection.computeRanges && window.csvData) {
+      window.axisProjection.computeRanges(window.csvData, axes);
+    }
 
     // Only use static + enabled axes
     let activeAxes = axes.filter(ax => ax.type === 'static' && ax.enabled);

@@ -102,6 +102,9 @@
         window.axisProjection.getProjections(window.dateInteraction.getCurrentDate(), window.dateInteraction.getStartDate(), window.dateInteraction.getEndDate(), window.csvData);
       }
     }
+    if (window.axisOverlay && window.axisOverlay.updateAxisHTML) {
+      window.axisOverlay.updateAxisHTML();
+    }
     updateTableByDate();
   }
 
