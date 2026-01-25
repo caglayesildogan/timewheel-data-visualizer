@@ -100,10 +100,20 @@
     for (let i = 0; i < total; i++) {
       const radialAngle = -Math.PI / 2 + rotationRad + (i / total) * (2 * Math.PI);
       const tangentAngle = radialAngle + Math.PI / 2;
-      const w = Math.abs(Math.sin(radialAngle)); // 1 at top/bottom, 0 at left/right
+      const w = Math.abs(Math.sin(radialAngle)); 
       // Shape target:
-      const radiusScale = 1 + m * (0.18 * (1 - w) - 0.22 * w);
-      const radius = baseRadius * radiusScale;
+      const radiusScale = 0.18 * (1 - w) - 0.22 * w;
+      const diagW = Math.SQRT1_2; 
+      let bias;
+      if (w <= diagW) {
+        const t = w / diagW;
+        bias = 3 - t * 1; 
+      } else {
+        const t = (w - diagW) / (1 - diagW);
+        bias = 0 - t * 5; 
+      }
+      const k = 0.03;
+      const radius = baseRadius * (1 + m * (radiusScale + k * bias));
 
       const nx = Math.cos(radialAngle);
       const ny = Math.sin(radialAngle);
