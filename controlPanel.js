@@ -296,7 +296,7 @@
       }
     })();
 
-    // Time mode selector (Tage / Monate / Jahre) + year count control
+    // Time mode selector (Tage / Jahre) + year count control
     (function createTimeModeControl(){
       const modeContainer = document.createElement('div');
       modeContainer.className = 'control-row time-mode-container';
@@ -309,9 +309,8 @@
       const select = document.createElement('select');
       select.id = 'timeModeSelect';
       const optDays = document.createElement('option'); optDays.value = 'days'; optDays.textContent = 'Tage';
-      const optMonths = document.createElement('option'); optMonths.value = 'months'; optMonths.textContent = 'Monate';
       const optYears = document.createElement('option'); optYears.value = 'years'; optYears.textContent = 'Jahre';
-      select.appendChild(optDays); select.appendChild(optMonths); select.appendChild(optYears);
+      select.appendChild(optDays); select.appendChild(optYears);
 
       const yearLabel = document.createElement('label');
       yearLabel.htmlFor = 'yearCount';
